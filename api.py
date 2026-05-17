@@ -49,3 +49,9 @@ async def analyze(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail=str(e))
     finally:
         os.unlink(tmp_path)
+
+if __name__ == "__main__":
+    import uvicorn
+    import os
+    port = int(os.environ.get("PORT", 10000))
+    uvicorn.run("api:app", host="0.0.0.0", port=port)
