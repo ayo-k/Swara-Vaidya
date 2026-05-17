@@ -8,6 +8,9 @@ from difflib import SequenceMatcher
 import re
 from scipy.ndimage import uniform_filter1d         # Smooth pitch curve
 from scipy.signal import find_peaks, resample      # Peak detection, resamp
+import torch
+print("CUDA available:", torch.cuda.is_available())
+print("PyTorch version:", torch.__version__)
 
 # -------------------------
 # Load reference features
@@ -46,9 +49,9 @@ tempo = float(tempo[0]) if isinstance(tempo, np.ndarray) else float(tempo)
 # MFCC
 mfcc = librosa.feature.mfcc(y=audio, sr=sr, n_mfcc=13)
 
-# -------------------------
+# -----------------------
 # 1. Pitch similarity
-# -------------------------
+# -----------------------
 # We compare how similar the pitch movements are between reference and user.
 # Steps:
 #   1. Keep only voiced frames (where pitch > 0, i.e. voice is active)
@@ -87,7 +90,7 @@ else:
     # Finds the best alignment between two sequences even if they have
     # different timing (user chanted slower or faster than reference).
     # D[-1,-1] = total cost of the best alignment path
-    # wp       = the actual alignment path
+    # wp = the actual alignment path
     # We divide by len(wp) to get average cost per step (normalize for length)
     D, wp = dtw(
         pitch_resampled.reshape(1, -1),
@@ -546,6 +549,150 @@ pitch_combined = (
     0.15 * accent_sim       +   # frame-level accent label placement
     0.10 * shape_sim            # intra-syllable pitch shape
 )
+
+# =============================================================================
+# WORD-LEVEL SVARA MAP
+# Maps pitch analysis back to actual words so feedback says:
+# "On 'gam' (word 2): expected udatta (rising), you sang anudatta (flat)"
+# =============================================================================
+
+HOP_LENGTH = 512  # default librosa hop length
+
+def build_word_svara_map(pitch_contour, word_timestamps, audio_sr):
+    """
+    For each word, slices the pitch contour using Whisper timestamps
+    and classifies dominant_accent + pitch_shape for that word.
+    """
+    if not word_timestamps or len(pitch_contour) == 0:
+        return []
+
+    voiced_vals = pitch_contour[pitch_contour > 0]
+    if len(voiced_vals) == 0:
+        return []
+
+    p_mean      = np.mean(voiced_vals)
+    p_std       = np.std(voiced_vals) + 1e-9
+    low_thresh  = np.percentile(voiced_vals, 33)
+    high_thresh = np.percentile(voiced_vals, 66)
+
+    word_map = []
+    for wt in word_timestamps:
+        start_frame = int(wt["start"] * audio_sr / HOP_LENGTH)
+        end_frame   = min(int(wt["end"] * audio_sr / HOP_LENGTH), len(pitch_contour) - 1)
+
+        if start_frame >= end_frame:
+            word_map.append({"word": wt["word"], "start": wt["start"], "end": wt["end"],
+                             "dominant_accent": "silence", "pitch_shape": "flat", "avg_pitch_norm": 0.0})
+            continue
+
+        segment    = pitch_contour[start_frame:end_frame]
+        voiced_seg = segment[segment > 0]
+
+        if len(voiced_seg) < 3:
+            dominant_accent, pitch_shape, avg_norm = "silence", "flat", 0.0
+        else:
+            counts = {"anudatta": 0, "neutral": 0, "udatta": 0}
+            for p in voiced_seg:
+                if p < low_thresh:       counts["anudatta"] += 1
+                elif p < high_thresh:    counts["neutral"]  += 1
+                else:                    counts["udatta"]   += 1
+            dominant_accent = max(counts, key=counts.get)
+            pitch_shape     = detect_pitch_shape(voiced_seg)  # reuses existing function
+            avg_norm        = float((np.mean(voiced_seg) - p_mean) / p_std)
+
+        word_map.append({"word": wt["word"], "start": wt["start"], "end": wt["end"],
+                         "dominant_accent": dominant_accent, "pitch_shape": pitch_shape,
+                         "avg_pitch_norm": avg_norm})
+    return word_map
+
+
+def build_ref_word_svara_map(ref_pitch_contour, ref_word_list, ref_audio_array, ref_sample_rate):
+    """
+    Reference has no Whisper timestamps, so divide equally across known words.
+    """
+    if not ref_word_list or len(ref_pitch_contour) == 0:
+        return []
+    duration_sec  = len(ref_audio_array) / ref_sample_rate
+    word_duration = duration_sec / len(ref_word_list)
+    synthetic_ts  = [{"word": w, "start": i * word_duration, "end": (i+1) * word_duration}
+                     for i, w in enumerate(ref_word_list)]
+    return build_word_svara_map(ref_pitch_contour, synthetic_ts, ref_sample_rate)
+
+
+def compare_word_svara_maps(ref_map, user_map):
+    """
+    Compares reference and user word-by-word.
+    Returns list of per-word feedback dicts with exact fix messages.
+    """
+    if not ref_map or not user_map:
+        return []
+
+    ACCENT_MEANING = {
+        "udatta":   "udatta — pitch must RISE on this syllable",
+        "anudatta": "anudatta — pitch stays LOW and flat",
+        "neutral":  "neutral — steady middle pitch",
+        "silence":  "silence",
+    }
+    SHAPE_MEANING = {
+        "rising":         "rising / udatta (vowel climbs upward)",
+        "falling":        "falling / anudatta (vowel descends)",
+        "rising_falling": "svarita — rise then fall within the vowel (circumflex)",
+        "flat":           "flat / sustained (no accent movement)",
+    }
+
+    items = []
+    total = max(len(ref_map), len(user_map))
+
+    for i in range(min(len(ref_map), len(user_map))):
+        rw, uw = ref_map[i], user_map[i]
+        word   = uw["word"]
+        wnum   = i + 1
+
+        accent_wrong = rw["dominant_accent"] != uw["dominant_accent"]
+        shape_wrong  = rw["pitch_shape"]     != uw["pitch_shape"]
+
+        accent_fix = shape_fix = None
+
+        if accent_wrong:
+            ra, ua = rw["dominant_accent"], uw["dominant_accent"]
+            if ra == "udatta":
+                accent_fix = (f"On '{word}' (word {wnum}/{total}): lift your pitch upward on the vowel. "
+                              f"This syllable carries the udatta accent — it must rise clearly. "
+                              f"You sang {ACCENT_MEANING.get(ua, ua)} instead.")
+            elif ra == "anudatta":
+                accent_fix = (f"On '{word}' (word {wnum}/{total}): keep pitch LOW and even. "
+                              f"Anudatta is the quiet ground before the accent. "
+                              f"You sang {ACCENT_MEANING.get(ua, ua)} instead.")
+            elif ra == "neutral":
+                accent_fix = (f"On '{word}' (word {wnum}/{total}): hold a steady middle pitch. "
+                              f"You sang {ACCENT_MEANING.get(ua, ua)} instead.")
+
+        if shape_wrong:
+            rs, us = rw["pitch_shape"], uw["pitch_shape"]
+            if rs == "rising_falling":
+                shape_fix = (f"On '{word}' (word {wnum}/{total}): this is a SVARITA syllable — "
+                             f"your voice must rise then fall within the vowel (circumflex shape). "
+                             f"Sing it in two movements: up then immediately down. "
+                             f"You sang {SHAPE_MEANING.get(us, us)} instead.")
+            elif rs == "rising":
+                shape_fix = (f"On '{word}' (word {wnum}/{total}): vowel should climb upward (udatta shape). "
+                             f"Let pitch rise as you hold the vowel. "
+                             f"You sang {SHAPE_MEANING.get(us, us)} instead.")
+            elif rs == "falling":
+                shape_fix = (f"On '{word}' (word {wnum}/{total}): vowel should descend (anudatta shape). "
+                             f"Let pitch gently fall through the vowel. "
+                             f"You sang {SHAPE_MEANING.get(us, us)} instead.")
+
+        items.append({"word": word, "word_num": wnum,
+                      "ref_accent": rw["dominant_accent"], "user_accent": uw["dominant_accent"],
+                      "ref_shape":  rw["pitch_shape"],     "user_shape":  uw["pitch_shape"],
+                      "accent_ok": not accent_wrong, "shape_ok": not shape_wrong,
+                      "accent_fix": accent_fix, "shape_fix": shape_fix})
+    return items
+
+
+# Build svara maps (needs ref_clean and word_timestamps_data — defined later,
+# so these calls are placed after Section 5 below)
  
 
 # -------------------------
@@ -594,22 +741,43 @@ mfcc_similarity = 100 * np.exp(-mfcc_distance / k)
 # --------------------------------------------------------
 # 4. Text similarity (No eSpeak / No phonemizer needed)
 # --------------------------------------------------------
-model = whisper.load_model("medium")
-
-# Transcribe user audio
-# Tip: initial_prompt guides Whisper toward Sanskrit mantra sounds
 ref_mantra = reference["mantra_text"]
-user_result = model.transcribe(
-    "user_chant1.wav",
-    language="en",
-    initial_prompt=f"This is a Sanskrit mantra chant: {ref_mantra}"
-)
-user_text = user_result["text"].lower().strip()
-ref_text = ref_mantra.lower().strip()
+ref_text   = ref_mantra.lower().strip()
+
+word_timestamps_data = []   # stores {word, start, end} per word — used by svara map
+
+try:
+    model = whisper.load_model("base")  # medium crashes on CPU; base is sufficient
+    user_result = model.transcribe(
+        "user_chant1.wav",
+        language                   = "en",
+        initial_prompt             = f"Sanskrit mantra: {ref_mantra}",
+        fp16                       = False,   # CPU does not support FP16
+        temperature                = 0.0,
+        best_of                    = 1,
+        beam_size                  = 1,
+        condition_on_previous_text = False,
+        word_timestamps            = True,    # gives per-word start/end seconds
+    )
+    user_text = user_result["text"].lower().strip()
+
+    # Extract per-word timestamps from Whisper segments
+    for segment in user_result.get("segments", []):
+        for w in segment.get("words", []):
+            wc = re.sub(r'[^a-z\s]', '', w["word"].lower()).strip()
+            if wc:
+                word_timestamps_data.append({
+                    "word":  wc,
+                    "start": float(w["start"]),
+                    "end":   float(w["end"]),
+                })
+
+except Exception as e:
+    print(f"Whisper failed: {e} — falling back to reference text")
+    user_text = ref_text
 
 print("Reference text :", ref_text)
 print("User text      :", user_text)
-
 # -------------------------
 # Clean text
 # -------------------------
@@ -680,13 +848,586 @@ overall = (
     0.15 * tempo_similarity     # rhythm
 )
 
-# -------------------------
-# Results
-# -------------------------
-print("\n========== RESULTS ==========")
+# =============================================================================
+# 6. FEEDBACK ENGINE
+# =============================================================================
+# Generates structured, actionable feedback in Vedic chanting terminology.
+# Covers all 4 dimensions: pronunciation (ucchāraṇa), pitch (svara),
+# rhythm (laya), and voice quality (nāda).
+#
+# Feedback structure:
+#   - overall_grade    : Uttama / Madhyama / Ādi / Prārambhika
+#   - dimension_report : per-dimension score + what went wrong + how to fix
+#   - priority_issues  : top 3 things to fix first (sorted by impact)
+#   - praise           : what the user did well (keeps motivation high)
+#   - sadhana_tip      : one focused practice suggestion
+# =============================================================================
+ 
+# ---------- helpers ----------------------------------------------------------
+ 
+# Build word-level svara maps now that ref_words and word_timestamps_data exist
+ref_svara_map       = build_ref_word_svara_map(ref_pitch, ref_words, ref_audio, ref_sr)
+user_svara_map      = build_word_svara_map(pitch, word_timestamps_data, sr)
+word_svara_feedback = compare_word_svara_maps(ref_svara_map, user_svara_map)
+
+
+def score_to_grade(score):
+    """Map 0-100 score to a traditional Sanskrit proficiency label."""
+    if score >= 85:
+        return "Uttama"          # उत्तम  — Excellent
+    elif score >= 70:
+        return "Madhyama"        # मध्यम  — Good / Middle
+    elif score >= 50:
+        return "Ādi"             # आदि    — Beginner / Foundation
+    else:
+        return "Prārambhika"     # प्रारंभिक — Just starting
+ 
+ 
+def score_to_emoji(score):
+    if score >= 85: return "✅"
+    elif score >= 70: return "🔶"
+    elif score >= 50: return "⚠️"
+    else: return "❌"
+ 
+ 
+# ---------- per-dimension feedback builders ----------------------------------
+ 
+def pronunciation_feedback(text_sim, ref_syllables, user_syllables, ref_words, user_words):
+    """
+    Ucchāraṇa (उच्चारण) — Pronunciation feedback.
+    Finds exactly which syllables or words differ and explains them.
+    """
+    issues   = []
+    praises  = []
+    tips     = []
+ 
+    # --- find mismatched words ---
+    matcher    = SequenceMatcher(None, ref_words, user_words)
+    wrong_words = []
+    for tag, i1, i2, j1, j2 in matcher.get_opcodes():
+        if tag in ('replace', 'delete'):
+            wrong_words.extend(ref_words[i1:i2])
+    if wrong_words:
+        issues.append(
+            f"Incorrect ucchāraṇa (pronunciation) detected for: "
+            f"'{', '.join(wrong_words[:4])}'"
+            + (" and more..." if len(wrong_words) > 4 else "")
+        )
+ 
+    # --- find mismatched syllables ---
+    syl_matcher   = SequenceMatcher(None, ref_syllables, user_syllables)
+    wrong_syls    = []
+    for tag, i1, i2, j1, j2 in syl_matcher.get_opcodes():
+        if tag in ('replace', 'delete'):
+            wrong_syls.extend(ref_syllables[i1:i2])
+    if wrong_syls:
+        issues.append(
+            f"Akṣara (syllable) errors in: '{', '.join(wrong_syls[:5])}'"
+            + (" and more..." if len(wrong_syls) > 5 else "")
+        )
+ 
+    # --- specific Sanskrit pronunciation tips for common errors ---
+    user_flat = user_clean.replace(" ", "")
+    ref_flat  = ref_clean.replace(" ", "")
+ 
+    # Check visarga (ḥ sound) — often dropped by beginners
+    if 'h' in ref_flat and 'h' not in user_flat:
+        issues.append("Visarga (ḥ) sounds are missing — the soft 'h' at syllable ends must be audible")
+        tips.append(
+            "Visarga sādhana: practice each visarga syllable in isolation — "
+            "e.g., 'namaḥ' → breathe out on the 'ḥ' like a soft echo"
+        )
+ 
+    # Check anusvara (ṃ/ṅ nasals) — often replaced with plain 'm'
+    if 'ng' in ref_flat or 'nm' in ref_flat:
+        if 'ng' not in user_flat and 'nm' not in user_flat:
+            issues.append(
+                "Anusvāra (ṃ) nasalization is missing — "
+                "syllables like 'aṃ', 'oṃ' need a nasal resonance, not a hard 'm'"
+            )
+            tips.append(
+                "Anusvāra sādhana: hum 'mmm' and feel the vibration in your skull — "
+                "that nasal resonance is the anusvāra quality"
+            )
+ 
+    # Praise if text similarity is high
+    if text_sim >= 75:
+        praises.append("Your mantra words and syllables are clearly recognizable — shuddha ucchāraṇa (pure pronunciation) foundation is present")
+ 
+    how_to_fix = []
+    if wrong_words:
+        how_to_fix.append(
+            "Repeat each incorrect word 10× in isolation before rejoining it to the mantra — "
+            "this is called 'pada-abhyāsa' (word-level practice)"
+        )
+    if wrong_syls:
+        how_to_fix.append(
+            "Break the mantra into individual akṣaras (syllables) and chant them with a pause between each — "
+            "'krama-pāṭha' technique"
+        )
+    how_to_fix += tips
+ 
+    return issues, praises, how_to_fix
+ 
+ 
+def pitch_feedback(pitch_combined, pitch_similarity, zone_sim, accent_sim,
+                   shape_sim, slope_sim, zone_feedback, shape_feedback,
+                   word_svara_feedback=None):
+    """
+    Svara feedback — now word-level aware.
+    Returns 4 values: issues, per_word_issues, praises, fixes
+    """
+    issues          = []
+    per_word_issues = []  # NEW — word-by-word breakdown
+    praises         = []
+    fixes           = []
+
+    # A. Overall contour
+    if pitch_similarity < 50:
+        issues.append("Svara-krama (melodic arc) diverges significantly from reference")
+        fixes.append("Listen to reference 3x with eyes closed, trace the pitch mentally, "
+                     "then hum melody on 'aa' before adding words")
+    elif pitch_similarity < 75:
+        issues.append("Svara-krama is partially correct but drifts in some sections")
+        fixes.append("Sa-grama sadhana: hum the pitch curve on 'aa' first, then add mantra text")
+
+    # B. Word-by-word svara breakdown  ← THE KEY NEW SECTION
+    accent_errors = 0
+    shape_errors  = 0
+    correct_words = []
+
+    if word_svara_feedback:
+        for item in word_svara_feedback:
+            if item["accent_ok"] and item["shape_ok"]:
+                correct_words.append(item["word"])
+                continue
+            if not item["accent_ok"]:
+                accent_errors += 1
+            if not item["shape_ok"]:
+                shape_errors += 1
+
+            detail = f"Word {item['word_num']}: '{item['word']}'"
+            if not item["accent_ok"]:
+                detail += (f"\n     Accent  — expected: {item['ref_accent']}  |  "
+                           f"you sang: {item['user_accent']}")
+                if item["accent_fix"]:
+                    detail += f"\n     Fix: {item['accent_fix']}"
+            if not item["shape_ok"]:
+                detail += (f"\n     Shape   — expected: {item['ref_shape']}  |  "
+                           f"you sang: {item['user_shape']}")
+                if item["shape_fix"]:
+                    detail += f"\n     Fix: {item['shape_fix']}"
+            per_word_issues.append(detail)
+
+        if accent_errors:
+            issues.append(f"Svara-sthana errors on {accent_errors} word(s) — "
+                          f"wrong udatta/anudatta/svarita placement changes the meaning. "
+                          f"See word-by-word breakdown below.")
+        if shape_errors:
+            issues.append(f"Svara-akrti errors on {shape_errors} word(s) — "
+                          f"pitch shape within vowel (rising/falling/circumflex) incorrect.")
+        if correct_words:
+            praises.append(f"Correct svara on: {', '.join(correct_words)}")
+    else:
+        # Fallback if Whisper timestamps unavailable
+        if accent_sim < 60:
+            issues.append("Svara-sthana errors detected — udatta on wrong syllables "
+                          "(word-level detail unavailable)")
+            fixes.append("Learn svara markers from printed text with accent notation")
+
+    # C. Zone-level (supplementary context)
+    for fb in zone_feedback:
+        if "Udatta" in fb and "not rising" in fb:
+            issues.append("Udatta zone too flat — raised accent must lift above anudatta base")
+            fixes.append("On each accented word (see list above): push pitch up suddenly, "
+                         "not gradually. The lift must be clear.")
+        elif "Svarita" in fb and "not dropping" in fb:
+            issues.append("Svarita zone not falling after peak")
+            fixes.append("After the peak word: let voice glide DOWN. "
+                         "Like a ball thrown up — the fall is part of the accent.")
+        elif "Anudatta" in fb and "unstable" in fb:
+            issues.append("Anudatta region unsteady — low section before accent must be calm")
+            fixes.append("Hold a drone at natural speaking pitch for 1 min — "
+                         "this is your anudatta baseline.")
+        elif "timing" in fb.lower():
+            issues.append("Accent peak timing is off — udatta arriving too early or late")
+            fixes.append("Chant at half speed with hand-clap on each syllable. "
+                         "Mark the udatta clap and practice landing on it.")
+
+    # D. Slope
+    if slope_sim < 50:
+        issues.append("Svara-vega (pitch transition speed) is incorrect")
+        fixes.append("Mimic reference 5x focusing ONLY on how fast pitch moves, not words")
+
+    # E. Praises
+    if pitch_combined >= 75:
+        praises.append("Overall svara-sadhana shows good understanding of the melodic arc")
+    if zone_sim >= 80:
+        praises.append("All three svara zones (anudatta, udatta, svarita) present and well-shaped")
+
+    return issues, per_word_issues, praises, fixes  # now 4 return values
+ 
+ 
+def rhythm_feedback(tempo_similarity, ref_audio, audio, sr):
+    """
+    Laya (लय) — Rhythm / Tempo feedback.
+    """
+    issues  = []
+    praises = []
+    fixes   = []
+ 
+    ref_duration  = len(ref_audio) / ref_sr
+    user_duration = len(audio)     / sr
+    duration_ratio = user_duration / (ref_duration + 1e-9)
+ 
+    if tempo_similarity < 50:
+        if duration_ratio > 1.3:
+            issues.append(
+                f"Laya is too slow — your chant is {round(duration_ratio, 1)}× longer than the reference. "
+                "In Vedic recitation, dragging the laya dilutes the mantra's śakti (power)"
+            )
+            fixes.append(
+                "Use a tāla (rhythmic clap) or metronome set to the reference tempo — "
+                "chant with the tāla until the laya is internalized (at least 21 repetitions)"
+            )
+        elif duration_ratio < 0.7:
+            issues.append(
+                f"Laya is too fast — your chant is compressed to {round(duration_ratio, 1)}× the reference length. "
+                "Rushing (druta-laya) causes syllable merging and loss of mantra clarity"
+            )
+            fixes.append(
+                "Practice in vilambita-laya (slow tempo) — chant at half your current speed, "
+                "holding each vowel for its full mātrā (mora) count before moving on"
+            )
+        else:
+            issues.append(
+                "Laya (rhythmic flow) is irregular — syllable durations are uneven "
+                "even though the overall length is close"
+            )
+            fixes.append(
+                "Krama-pāṭha sādhana: chant with a steady hand-clap on every syllable — "
+                "each clap forces equal duration for each akṣara"
+            )
+    elif tempo_similarity < 75:
+        issues.append(
+            "Minor laya deviations detected — some syllables are stretched or compressed "
+            "beyond the natural mātrā (mora) proportion"
+        )
+        fixes.append(
+            "Record yourself and listen back counting mātrās: "
+            "short vowels = 1 mātrā, long vowels = 2 mātrās. "
+            "Ensure this ratio is maintained throughout"
+        )
+    else:
+        praises.append("Laya (rhythmic timing) is well-maintained — syllable flow follows the reference closely")
+ 
+    # Check onset pattern regularity
+    user_onset_local = get_onset_envelope(audio, sr)
+    onset_std = float(np.std(np.diff(np.where(user_onset_local > 0.5)[0]))) if np.any(user_onset_local > 0.5) else 0
+    if onset_std > 20:
+        issues.append(
+            "Syllable onset pattern is irregular — some syllables attack too hard or too softly, "
+            "breaking the samatvam (evenness) of the chant"
+        )
+        fixes.append(
+            "Practice 'mṛdu-pāṭha' (soft reading): chant very softly so you cannot force hard attacks — "
+            "this trains even onset strength"
+        )
+ 
+    return issues, praises, fixes
+ 
+ 
+def voice_quality_feedback(mfcc_similarity):
+    """
+    Nāda (नाद) — Voice quality / timbre feedback.
+    """
+    issues  = []
+    praises = []
+    fixes   = []
+ 
+    if mfcc_similarity < 40:
+        issues.append(
+            "Nāda-guṇa (voice quality / resonance) is significantly different from the reference — "
+            "the timbral character of your voice needs adjustment for this mantra"
+        )
+        fixes.append(
+            "Warm up with 'Nāda-sādhana': hum 'mmm' for 2 minutes feeling chest resonance, "
+            "then 'nnn' feeling nasal resonance, then 'ṅṅṅ' feeling skull resonance — "
+            "find which resonance mode matches the reference chant"
+        )
+        fixes.append(
+            "Check your posture: sit in sukhāsana (comfortable cross-legged position) with spine erect — "
+            "slouching compresses the svara-yantra (voice box) and changes the nāda quality"
+        )
+    elif mfcc_similarity < 65:
+        issues.append(
+            "Nāda-guṇa has room for improvement — some formants (vowel resonances) "
+            "do not match the reference mantra's tonal character"
+        )
+        fixes.append(
+            "Focus on vowel openness: Sanskrit 'a' is an open, round sound (like 'aum' prefix) — "
+            "do not collapse it to the English schwa 'uh'"
+        )
+        fixes.append(
+            "Practice the mantra in a bathroom or tile room to hear your resonance clearly — "
+            "a rich, ringing nāda indicates correct throat/mouth shaping"
+        )
+    elif mfcc_similarity < 80:
+        issues.append(
+            "Minor nāda inconsistencies — vowel quality drifts slightly in the middle of the chant"
+        )
+        fixes.append(
+            "Maintain 'jihvā-mūla' (tongue root) position consistently — "
+            "do not let the tongue tense or retreat mid-chant"
+        )
+    else:
+        praises.append(
+            "Nāda-guṇa (voice quality) is authentic — your resonance closely mirrors the reference chant's timbral signature"
+        )
+ 
+    if mfcc_similarity >= 70:
+        praises.append("Voice consistency is good throughout the chant — no major tonal breaks detected")
+ 
+    return issues, praises, fixes
+ 
+ 
+# ---------- priority ranking -------------------------------------------------
+ 
+def rank_priority_issues(text_sim, pitch_combined, tempo_similarity, mfcc_similarity):
+    """
+    Identifies which dimension needs the most work,
+    ranked by impact on overall score × severity of the gap.
+    """
+    # weight mirrors the overall score formula
+    dimensions = [
+    ("Uccharana (Pronunciation)",  text_sim,         0.40),
+    ("Nada (Voice Quality)",        mfcc_similarity,  0.25),
+    ("Svara (Pitch / Accent)",      pitch_combined,   0.20),
+    ("Laya (Rhythm)",               tempo_similarity, 0.15),
+    ]
+    # Store impact as explicit 4th element — prevents unstable sort ordering
+    dimensions = [(name, score, weight, round(weight * (100 - score), 2))
+                 for name, score, weight in dimensions]
+    ranked = sorted(dimensions, key=lambda x: x[3], reverse=True)
+    return ranked  # (name, score, weight, impact)
+ 
+ 
+# ---------- sadhana tip generator --------------------------------------------
+ 
+def generate_sadhana_tip(overall, text_sim, pitch_combined, tempo_similarity, mfcc_similarity):
+    """
+    Returns one focused daily-practice recommendation based on the biggest gap.
+    """
+    priority = rank_priority_issues(text_sim, pitch_combined, tempo_similarity, mfcc_similarity)
+    weakest_dim, weakest_score, _, _ = priority[0]
+ 
+    if overall >= 85:
+        return (
+            "Siddhi-sādhana: you are at Uttama level. Now focus on 'bhāvopāsanā' — "
+            "chant with full meditative intention. Correct form + intention = complete mantra-sādhana"
+        )
+    elif "Pronunciation" in weakest_dim:
+        return (
+            "Daily sādhana: 10 minutes of 'pada-pāṭha' — chant the mantra word-by-word, "
+            "pause after each word and verify it against the reference before continuing. "
+            "Do this for 21 days to build correct saṃskāra (mental impression)"
+        )
+    elif "Svara" in weakest_dim:
+        return (
+            "Daily sādhana: 10 minutes of 'svara-abhyāsa' — chant only the pitch melody "
+            "on a single vowel 'ā' first (no words), then overlay the mantra text. "
+            "This isolates svara training from ucchāraṇa"
+        )
+    elif "Rhythm" in weakest_dim:
+        return (
+            "Daily sādhana: 10 minutes of 'tāla-pāṭha' — clap on every syllable while chanting. "
+            "Use vilambita-laya (slow tempo) for the first 5 minutes, "
+            "then madhya-laya (medium) for the next 5"
+        )
+    else:  # Nāda
+        return (
+            "Daily sādhana: 10 minutes of 'nāda-dhyāna' — before chanting, hum 'Aum' for 3 minutes "
+            "feeling the vibration in chest, throat, and head. "
+            "This opens the three resonance chambers needed for authentic mantra nāda"
+        )
+ 
+ 
+# ---------- master feedback function -----------------------------------------
+ 
+def generate_full_feedback(
+    text_sim, pitch_combined, tempo_similarity, mfcc_similarity,
+    pitch_similarity, zone_sim, accent_sim, shape_sim, slope_sim,
+    zone_feedback, shape_feedback,
+    ref_syllables, user_syllables, ref_words, user_words,
+    overall,
+    word_svara_feedback=None
+):
+    """
+    Master feedback generator.
+    Returns a structured dict with all feedback data,
+    and prints a formatted report.
+    """
+ 
+    # --- collect per-dimension feedback ---
+    uc_issues, uc_praises, uc_fixes = pronunciation_feedback(
+        text_sim, ref_syllables, user_syllables, ref_words, user_words
+    )
+    sv_issues, sv_per_word, sv_praises, sv_fixes = pitch_feedback(
+        pitch_combined, pitch_similarity, zone_sim, accent_sim,
+        shape_sim, slope_sim, zone_feedback, shape_feedback,
+        word_svara_feedback=word_svara_feedback
+    )
+    la_issues, la_praises, la_fixes = rhythm_feedback(
+        tempo_similarity, ref_audio, audio, sr
+    )
+    na_issues, na_praises, na_fixes = voice_quality_feedback(mfcc_similarity)
+ 
+    # --- overall grade ---
+    overall_grade = score_to_grade(overall)
+ 
+    # --- priority ranking ---
+    priority_dims = rank_priority_issues(text_sim, pitch_combined, tempo_similarity, mfcc_similarity)
+ 
+    # --- sadhana tip ---
+    sadhana_tip = generate_sadhana_tip(overall, text_sim, pitch_combined, tempo_similarity, mfcc_similarity)
+ 
+    # ---------------------------------------------------------------
+    # PRINT REPORT
+    # ---------------------------------------------------------------
+    sep = "=" * 62
+ 
+    print(f"\n{sep}")
+    print(f"  MANTRA CHANTING FEEDBACK REPORT")
+    print(f"  समीक्षा प्रतिवेदन  |  Samīkṣā Prativedana")
+    print(sep)
+ 
+    print(f"\n  Overall Score  : {round(overall, 1)}%  →  {overall_grade}  {score_to_emoji(overall)}")
+    print(f"\n  Mantra         : {ref_text}")
+    print(sep)
+ 
+    # ---- Dimension scores ----
+    print("\n📊 DIMENSION SCORES")
+    print(f"  Ucchāraṇa  (Pronunciation)  : {round(text_sim, 1):5.1f}%  {score_to_emoji(text_sim)}")
+    print(f"  Nāda       (Voice Quality)  : {round(mfcc_similarity, 1):5.1f}%  {score_to_emoji(mfcc_similarity)}")
+    print(f"  Svara      (Pitch/Accent)   : {round(pitch_combined, 1):5.1f}%  {score_to_emoji(pitch_combined)}")
+    print(f"    ↳ Contour shape           : {round(pitch_similarity, 1):5.1f}%")
+    print(f"    ↳ Zone (U/A/S) accuracy   : {round(zone_sim, 1):5.1f}%")
+    print(f"    ↳ Accent placement        : {round(accent_sim, 1):5.1f}%")
+    print(f"    ↳ Syllable shape          : {round(shape_sim, 1):5.1f}%")
+    print(f"    ↳ Slope / steepness       : {round(slope_sim, 1):5.1f}%")
+    print(f"  Laya       (Rhythm/Tempo)   : {round(tempo_similarity, 1):5.1f}%  {score_to_emoji(tempo_similarity)}")
+ 
+    # ---- Priority issues ----
+    print(f"\n🎯 FOCUS AREAS  (ranked by impact)")
+    for i, (dim, score, weight, impact) in enumerate(priority_dims, 1):
+        gap = 100 - score
+        print(f"  {i}. {dim:<32} Score: {round(score,1)}%  Gap: {round(gap,1)}%  Impact: {impact}")
+    # ---- What you did well ----
+    all_praises = uc_praises + sv_praises + la_praises + na_praises
+    if all_praises:
+        print(f"\n✨ WHAT YOU DID WELL  (Sādhu! साधु!)")
+        for p in all_praises:
+            print(f"  ✓ {p}")
+ 
+    # ---- Ucchāraṇa ----
+    print(f"\n🔤 UCCHĀRAṆA  (Pronunciation)  —  {round(text_sim, 1)}%  {score_to_emoji(text_sim)}")
+    if uc_issues:
+        print("  Issues:")
+        for issue in uc_issues:
+            print(f"    • {issue}")
+        print("  How to improve:")
+        for fix in uc_fixes:
+            print(f"    → {fix}")
+    else:
+        print("  ✓ No significant pronunciation issues detected")
+ 
+    # ---- Svara ----
+    print(f"\n🎵 SVARA  (Pitch / Vedic Accent)  —  {round(pitch_combined, 1)}%  {score_to_emoji(pitch_combined)}")
+    if sv_issues:
+        print("  Summary:")
+        for issue in sv_issues:
+            print(f"    • {issue}")
+    if sv_per_word:
+        print("\n  Word-by-word svara breakdown:")
+        print("  " + "-" * 54)
+        for detail in sv_per_word:
+            for line in detail.split("\n"):
+                print(f"    {line}")
+            print()
+    if sv_fixes:
+        print("  General practice techniques:")
+        for fix in sv_fixes:
+            print(f"    → {fix}")
+    if not sv_issues and not sv_per_word:
+        print("  ✓ Svara accuracy is good — pitch accents are well-placed")
+ 
+    # ---- Laya ----
+    print(f"\n🥁 LAYA  (Rhythm / Tempo)  —  {round(tempo_similarity, 1)}%  {score_to_emoji(tempo_similarity)}")
+    if la_issues:
+        print("  Issues:")
+        for issue in la_issues:
+            print(f"    • {issue}")
+        print("  How to improve:")
+        for fix in la_fixes:
+            print(f"    → {fix}")
+    else:
+        print("  ✓ Laya is steady — rhythmic flow matches the reference well")
+ 
+    # ---- Nāda ----
+    print(f"\n🔔 NĀDA  (Voice Quality / Resonance)  —  {round(mfcc_similarity, 1)}%  {score_to_emoji(mfcc_similarity)}")
+    if na_issues:
+        print("  Issues:")
+        for issue in na_issues:
+            print(f"    • {issue}")
+        print("  How to improve:")
+        for fix in na_fixes:
+            print(f"    → {fix}")
+    else:
+        print("  ✓ Nāda quality is authentic — resonance matches the reference")
+ 
+    # ---- Sadhana tip ----
+    print(f"\n🪔 DAILY SĀDHANA RECOMMENDATION")
+    print(f"  {sadhana_tip}")
+ 
+    print(f"\n{sep}")
+    print("  Om Shanti  🙏  |  ॐ शान्तिः")
+    print(sep + "\n")
+ 
+    # Return structured dict for programmatic use / UI display
+    return {
+        "overall_score" : round(overall, 2),
+        "overall_grade" : overall_grade,
+        "mantra"        : ref_text,
+        "dimensions": {
+            "uccharana"  : {"score": round(text_sim, 2),        "issues": uc_issues, "fixes": uc_fixes, "praises": uc_praises},
+            "svara"      : {"score": round(pitch_combined, 2),  "issues": sv_issues, "fixes": sv_fixes, "praises": sv_praises},
+            "laya"       : {"score": round(tempo_similarity, 2),"issues": la_issues, "fixes": la_fixes, "praises": la_praises},
+            "nada"       : {"score": round(mfcc_similarity, 2), "issues": na_issues, "fixes": na_fixes, "praises": na_praises},
+        },
+        "priority_order"  : [d[0] for d in priority_dims],
+        "sadhana_tip"     : sadhana_tip,
+        "all_praises"     : all_praises,
+    }
+ 
+ 
+# =============================================================================
+# 7. RESULTS + FEEDBACK
+# =============================================================================
+print("\n========== RAW SCORES ==========")
 print("Text Similarity  :", round(text_similarity, 2), "%")
 print("Pitch Similarity :", round(pitch_combined, 2), "%")
 print("Rhythm Similarity:", round(tempo_similarity, 2), "%")
 print("Voice Similarity :", round(mfcc_similarity,  2), "%")
 print("Overall Score    :", round(overall, 2), "%")
-print("==============================")
+print("================================")
+ 
+# Run full feedback engine
+feedback_result = generate_full_feedback(
+    text_similarity, pitch_combined, tempo_similarity, mfcc_similarity,
+    pitch_similarity, zone_sim, accent_sim, shape_sim, slope_sim,
+    zone_feedback, shape_feedback,
+    ref_syllables, user_syllables, ref_words, user_words,
+    overall,
+    word_svara_feedback=word_svara_feedback
+)
+ 
