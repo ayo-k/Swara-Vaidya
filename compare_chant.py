@@ -9,8 +9,9 @@ import re
 from scipy.ndimage import uniform_filter1d         # Smooth pitch curve
 from scipy.signal import find_peaks, resample      # Peak detection, resamp
 import torch
-print("CUDA available:", torch.cuda.is_available())
-print("PyTorch version:", torch.__version__)
+# Load Whisper once (shared by direct run and API)
+import whisper as _whisper
+WHISPER_MODEL = _whisper.load_model("base")
 
 # -------------------------
 # Load reference features
@@ -1431,3 +1432,201 @@ feedback_result = generate_full_feedback(
     word_svara_feedback=word_svara_feedback
 )
  
+
+# =============================================================================
+# 8. ENTRY POINT — called by api.py per request
+# =============================================================================
+def analyze_chant(user_audio_path: str) -> dict:
+    """
+    Runs the full analysis on a user audio file.
+    All functions above are used as-is — nothing is changed.
+    Returns the feedback_result dict for the API to serve as JSON.
+    """
+    global audio, sr, pitch, tempo, mfcc   # make these available to feedback functions
+                                            # that reference them (e.g. rhythm_feedback)
+
+    # ── Load user chant ──
+    audio, sr = librosa.load(user_audio_path)
+    audio, _  = librosa.effects.trim(audio)
+
+    # ── Pitch ──
+    pitch, _, _ = librosa.pyin(
+        audio,
+        fmin=librosa.note_to_hz('C2'),
+        fmax=librosa.note_to_hz('C7')
+    )
+    pitch = np.nan_to_num(pitch)
+
+    # ── Tempo ──
+    tempo_arr, _ = librosa.beat.beat_track(y=audio, sr=sr)
+    tempo = float(tempo_arr[0]) if isinstance(tempo_arr, np.ndarray) else float(tempo_arr)
+
+    # ── MFCC ──
+    mfcc = librosa.feature.mfcc(y=audio, sr=sr, n_mfcc=13)
+
+    # ── 1. Pitch similarity ──
+    pitch_voiced     = pitch[pitch > 0]
+    ref_pitch_voiced = ref_pitch[ref_pitch > 0]
+    if len(pitch_voiced) == 0 or len(ref_pitch_voiced) == 0:
+        pitch_similarity = 0.0
+    else:
+        pitch_log     = np.log2(pitch_voiced)
+        ref_pitch_log = np.log2(ref_pitch_voiced)
+        pitch_norm     = (pitch_log - np.mean(pitch_log))         / (np.std(pitch_log)         + 1e-9)
+        ref_pitch_norm = (ref_pitch_log - np.mean(ref_pitch_log)) / (np.std(ref_pitch_log)     + 1e-9)
+        pitch_resampled     = resample(pitch_norm,     100)
+        ref_pitch_resampled = resample(ref_pitch_norm, 100)
+        D, wp = dtw(pitch_resampled.reshape(1, -1), ref_pitch_resampled.reshape(1, -1), metric='euclidean')
+        dtw_distance     = D[-1, -1] / len(wp)
+        pitch_similarity = 100 * np.exp(-dtw_distance / 5)
+
+    # ── 1-a Zone analysis ──
+    ref_zones,  ref_norm  = extract_pitch_zones(ref_pitch)
+    user_zones, user_norm = extract_pitch_zones(pitch)
+    zone_sim, zone_feedback = compare_pitch_zones(ref_zones, user_zones)
+
+    # ── 1-b Accent classifier ──
+    ref_accent_levels  = classify_accent_levels(ref_pitch)
+    user_accent_levels = classify_accent_levels(pitch)
+    if len(ref_accent_levels) > 0 and len(user_accent_levels) > 0:
+        accent_sim = SequenceMatcher(None, ref_accent_levels.tolist(), user_accent_levels.tolist()).ratio() * 100
+    else:
+        accent_sim = 0.0
+
+    # ── 1-c Syllable shape ──
+    ref_shapes  = analyze_syllable_shapes(ref_pitch)
+    user_shapes = analyze_syllable_shapes(pitch)
+    shape_sim, shape_feedback = shape_sequence_similarity(ref_shapes, user_shapes)
+
+    # ── Slope ──
+    slope_sim = pitch_slope_similarity(ref_pitch, pitch)
+
+    # ── Combined pitch ──
+    pitch_combined = (
+        0.35 * pitch_similarity +
+        0.25 * zone_sim         +
+        0.15 * slope_sim        +
+        0.15 * accent_sim       +
+        0.10 * shape_sim
+    )
+
+    # ── 2. Rhythm ──
+    user_onset = get_onset_envelope(audio, sr)
+    ref_onset  = get_onset_envelope(ref_audio, ref_sr)
+    D, wp = dtw(user_onset.reshape(1, -1), ref_onset.reshape(1, -1), metric='euclidean')
+    onset_dist       = D[-1, -1] / len(wp)
+    tempo_similarity = 100 * np.exp(-onset_dist / 0.3)
+
+    # ── 3. MFCC ──
+    mfcc_scaled     = StandardScaler().fit_transform(mfcc.T).T
+    ref_mfcc_scaled = StandardScaler().fit_transform(ref_mfcc.T).T
+    delta           = librosa.feature.delta(mfcc_scaled)
+    ref_delta       = librosa.feature.delta(ref_mfcc_scaled)
+    mfcc_combined     = np.vstack([mfcc_scaled, delta])
+    ref_mfcc_combined = np.vstack([ref_mfcc_scaled, ref_delta])
+    D, wp = dtw(mfcc_combined, ref_mfcc_combined, metric='euclidean')
+    mfcc_distance   = D[-1, -1] / len(wp)
+    mfcc_similarity = 100 * np.exp(-mfcc_distance / 50)
+
+    # ── 4. Text / Whisper ──
+    word_timestamps_data = []
+    try:
+        user_result = WHISPER_MODEL.transcribe(
+            user_audio_path,
+            language                   = "en",
+            initial_prompt             = f"Sanskrit mantra: {ref_mantra}",
+            fp16                       = False,
+            temperature                = 0.0,
+            best_of                    = 1,
+            beam_size                  = 1,
+            condition_on_previous_text = False,
+            word_timestamps            = True,
+        )
+        user_text = user_result["text"].lower().strip()
+        for segment in user_result.get("segments", []):
+            for w in segment.get("words", []):
+                wc = re.sub(r'[^a-z\s]', '', w["word"].lower()).strip()
+                if wc:
+                    word_timestamps_data.append({
+                        "word":  wc,
+                        "start": float(w["start"]),
+                        "end":   float(w["end"]),
+                    })
+    except Exception as e:
+        print(f"Whisper error: {e}")
+        user_text = ref_text
+
+    ref_clean  = clean_text(ref_text)
+    user_clean = clean_text(user_text)
+    ref_words  = ref_clean.split()
+    user_words = user_clean.split()
+    ref_syllables  = split_syllables(ref_clean)
+    user_syllables = split_syllables(user_clean)
+
+    char_sim = SequenceMatcher(None, ref_clean,  user_clean).ratio()
+    word_sim = SequenceMatcher(None, ref_words,  user_words).ratio()
+    syl_sim  = SequenceMatcher(None, ref_syllables, user_syllables).ratio()
+    text_similarity = (0.20 * char_sim + 0.30 * word_sim + 0.50 * syl_sim) * 100
+
+    # ── 5. Overall ──
+    overall = (
+        0.40 * text_similarity  +
+        0.25 * mfcc_similarity  +
+        0.20 * pitch_combined   +
+        0.15 * tempo_similarity
+    )
+
+    # ── Word svara maps ──
+    ref_svara_map       = build_ref_word_svara_map(ref_pitch, ref_words, ref_audio, ref_sr)
+    user_svara_map      = build_word_svara_map(pitch, word_timestamps_data, sr)
+    word_svara_feedback = compare_word_svara_maps(ref_svara_map, user_svara_map)
+
+    # ── Feedback ──
+    feedback_result = generate_full_feedback(
+        text_similarity, pitch_combined, tempo_similarity, mfcc_similarity,
+        pitch_similarity, zone_sim, accent_sim, shape_sim, slope_sim,
+        zone_feedback, shape_feedback,
+        ref_syllables, user_syllables, ref_words, user_words,
+        overall,
+        word_svara_feedback=word_svara_feedback
+    )
+
+    # ── Add extra fields the API needs ──
+    feedback_result["user_transcript"]   = user_text
+    feedback_result["word_timestamps"]   = word_timestamps_data
+    feedback_result["svara_word_detail"] = word_svara_feedback
+    feedback_result["scores"] = {
+        "text_similarity" : round(text_similarity,  2),
+        "pitch_combined"  : round(pitch_combined,   2),
+        "tempo_similarity": round(tempo_similarity, 2),
+        "mfcc_similarity" : round(mfcc_similarity,  2),
+        "overall"         : round(overall,          2),
+        "pitch_breakdown" : {
+            "contour_shape"   : round(pitch_similarity, 2),
+            "zone_accuracy"   : round(zone_sim,         2),
+            "accent_placement": round(accent_sim,        2),
+            "syllable_shape"  : round(shape_sim,         2),
+            "slope_steepness" : round(slope_sim,         2),
+        }
+    }
+    feedback_result["priority"] = [
+        {"dimension": d, "score": round(s, 2), "impact": imp}
+        for d, s, w, imp in rank_priority_issues(
+            text_similarity, pitch_combined, tempo_similarity, mfcc_similarity
+        )
+    ]
+    return feedback_result
+
+
+# =============================================================================
+# 9. RUN DIRECTLY (python compare_chant.py) — unchanged behaviour
+# =============================================================================
+if __name__ == "__main__":
+    result = analyze_chant("user_chant1.wav")
+    print("\n========== RAW SCORES ==========")
+    print("Text Similarity  :", result["scores"]["text_similarity"],  "%")
+    print("Pitch Similarity :", result["scores"]["pitch_combined"],   "%")
+    print("Rhythm Similarity:", result["scores"]["tempo_similarity"], "%")
+    print("Voice Similarity :", result["scores"]["mfcc_similarity"],  "%")
+    print("Overall Score    :", result["scores"]["overall"],          "%")
+    print("================================")
