@@ -1,0 +1,9 @@
+fastapi
+uvicorn
+librosa
+numpy
+openai-whisper
+scikit-learn
+scipy
+torch
+python-multipart
