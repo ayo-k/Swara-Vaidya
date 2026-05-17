@@ -1083,7 +1083,7 @@ def generate_full_feedback(
     print(sep)
  
     print(f"\n  Overall Score  : {round(overall, 1)}%  →  {overall_grade}  {score_to_emoji(overall)}")
-    print(f"\n  Mantra         : {ref_text}")
+    print(f"\n  Mantra         : {ref_mantra}")
     print(sep)
  
     # ---- Dimension scores ----
@@ -1178,7 +1178,7 @@ def generate_full_feedback(
     return {
         "overall_score" : round(overall, 2),
         "overall_grade" : overall_grade,
-        "mantra"        : ref_text,
+        "mantra"        : ref_mantra,
         "dimensions": {
             "uccharana"  : {"score": round(text_sim, 2),        "issues": uc_issues, "fixes": uc_fixes, "praises": uc_praises},
             "svara"      : {"score": round(pitch_combined, 2),  "issues": sv_issues, "fixes": sv_fixes, "praises": sv_praises},
