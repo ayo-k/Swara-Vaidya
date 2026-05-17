@@ -748,7 +748,15 @@ ref_text   = ref_mantra.lower().strip()
 word_timestamps_data = []   # stores {word, start, end} per word — used by svara map
 
 try:
-    model = whisper.load_model("base")  # medium crashes on CPU; base is sufficient
+    from contextlib import asynccontextmanager
+
+@asynccontextmanager
+async def lifespan(app):
+    global model
+    model = whisper.load_model("base")
+    yield
+
+app = FastAPI(lifespan=lifespan)  # medium crashes on CPU; base is sufficient
     user_result = model.transcribe(
         "user_chant1.wav",
         language                   = "en",
