@@ -1,7 +1,7 @@
 import librosa
 import numpy as np
 import json
-import whisper
+import whisper as _whisper
 from sklearn.preprocessing import StandardScaler
 from librosa.sequence import dtw
 from difflib import SequenceMatcher
@@ -10,46 +10,45 @@ from scipy.ndimage import uniform_filter1d         # Smooth pitch curve
 from scipy.signal import find_peaks, resample      # Peak detection, resamp
 import torch
 # Load Whisper once (shared by direct run and API)
-import whisper as _whisper
-WHISPER_MODEL = _whisper.load_model("base")
+# ── These are safe at module level (just assignments, no I/O) ──
+WHISPER_MODEL = None   # loaded lazily in _load_references()
+ref_pitch     = None
+ref_tempo     = None
+ref_mfcc      = None
+ref_audio     = None
+ref_sr        = None
+ref_mantra    = None
 
-# -------------------------
-# Load reference features
-# -------------------------
-with open("reference_features.json", "r") as f:
-    reference = json.load(f)
+def _load_references():
+    """
+    Called ONCE when the first request arrives (not at import time).
+    This lets uvicorn bind the port immediately, then load heavy models.
+    """
+    global WHISPER_MODEL, ref_pitch, ref_tempo, ref_mfcc
+    global ref_audio, ref_sr, ref_mantra
 
-ref_pitch = np.array(reference["pitch_contour"])
-ref_tempo = reference["tempo"]
-ref_mfcc = np.array(reference["mfcc"])
+    if WHISPER_MODEL is not None:
+        return   # already loaded — skip
 
-# -------------------------
-# Load reference audio
-# -------------------------
-ref_audio, ref_sr = librosa.load("chant1.wav")
-ref_audio, _ = librosa.effects.trim(ref_audio)
+    print("Loading Whisper model...")
+    WHISPER_MODEL = _whisper.load_model("base")
+    print("Whisper ready.")
 
-# -------------------------
-# Load user chant
-# -------------------------
-audio, sr = librosa.load("user_chant1.wav")
-audio, _ = librosa.effects.trim(audio)
+    with open("reference_features.json", "r") as f:
+        reference = json.load(f)
 
-# Pitch
-pitch, _, _ = librosa.pyin(
-    audio,
-    fmin=librosa.note_to_hz('C2'),
-    fmax=librosa.note_to_hz('C7')
-)
-pitch = np.nan_to_num(pitch)
+    ref_pitch  = np.array(reference["pitch_contour"])
+    ref_tempo  = reference["tempo"]
+    ref_mfcc   = np.array(reference["mfcc"])
+    ref_mantra = reference["mantra_text"]
 
-# Tempo
-tempo, _ = librosa.beat.beat_track(y=audio, sr=sr)
-tempo = float(tempo[0]) if isinstance(tempo, np.ndarray) else float(tempo)
+    ref_audio_raw, ref_sr_raw = librosa.load("chant1.wav")
+    ref_audio_trimmed, _      = librosa.effects.trim(ref_audio_raw)
 
-# MFCC
-mfcc = librosa.feature.mfcc(y=audio, sr=sr, n_mfcc=13)
+    ref_audio = ref_audio_trimmed
+    ref_sr    = ref_sr_raw
 
+    print("Reference data loaded.")
 # -----------------------
 # 1. Pitch similarity
 # -----------------------
@@ -61,51 +60,6 @@ mfcc = librosa.feature.mfcc(y=audio, sr=sr, n_mfcc=13)
 #   4. Resample to same length (DTW works better with equal length)
 #   5. DTW comparison
 #   6. Convert distance to similarity score
- 
-pitch_voiced     = pitch[pitch > 0]
-ref_pitch_voiced = ref_pitch[ref_pitch > 0]
- 
-if len(pitch_voiced) == 0 or len(ref_pitch_voiced) == 0:
-    pitch_similarity = 0.0
- 
-else:
-    # Log scale — because a jump from 100Hz to 200Hz feels the same
-    # as a jump from 200Hz to 400Hz to the human ear
-    pitch_log     = np.log2(pitch_voiced)
-    ref_pitch_log = np.log2(ref_pitch_voiced)
- 
-    # Z-score normalization:
-    #   subtract mean → removes absolute pitch level (gender difference)
-    #   divide by std  → removes pitch range difference
-    # Now both curves are centered at 0 and have same scale.
-    # DTW only sees the SHAPE of the melody, not the absolute key.
-    pitch_norm     = (pitch_log - np.mean(pitch_log))         / (np.std(pitch_log)         + 1e-9)
-    ref_pitch_norm = (ref_pitch_log - np.mean(ref_pitch_log)) / (np.std(ref_pitch_log)     + 1e-9)
- 
-    # Resample both to length 100 — equal length improves DTW accuracy
-    # (Idea from the improved pitch analysis document)
-    pitch_resampled     = resample(pitch_norm,     100)
-    ref_pitch_resampled = resample(ref_pitch_norm, 100)
- 
-    # DTW = Dynamic Time Warping
-    # Finds the best alignment between two sequences even if they have
-    # different timing (user chanted slower or faster than reference).
-    # D[-1,-1] = total cost of the best alignment path
-    # wp = the actual alignment path
-    # We divide by len(wp) to get average cost per step (normalize for length)
-    D, wp = dtw(
-        pitch_resampled.reshape(1, -1),
-        ref_pitch_resampled.reshape(1, -1),
-        metric='euclidean'
-    )
-    dtw_distance     = D[-1, -1] / len(wp)
- 
-    # Convert distance to 0-100% score using exponential decay:
-    # distance=0   → score=100% (perfect)
-    # distance=5   → score=37%
-    # distance=10  → score=14%
-    pitch_similarity = 100 * np.exp(-dtw_distance / 5)
- 
  
 # =============================================================================
 # 1-a PITCH ZONE ANALYSIS (Vedic Accent: Udatta / Anudatta / Svarita)
@@ -281,14 +235,6 @@ def compare_pitch_zones(ref_zones, user_zones):
     zone_similarity = float(np.mean(scores)) * 100 if scores else 0.0
     return zone_similarity, feedback
  
- 
-# --- Run zone analysis ---
-ref_zones,  ref_norm  = extract_pitch_zones(ref_pitch)
-user_zones, user_norm = extract_pitch_zones(pitch)
- 
-zone_sim, zone_feedback = compare_pitch_zones(ref_zones, user_zones)
- 
- 
 # =============================================================================
 # 1-b — ACCENT LEVEL CLASSIFIER (BHASHA 2025 paper)
 # =============================================================================
@@ -337,23 +283,6 @@ def classify_accent_levels(pitch_contour):
         else:
             levels.append(3)    # Udatta — high pitch (accent peak)
     return np.array(levels)
- 
-ref_accent_levels  = classify_accent_levels(ref_pitch)
-user_accent_levels = classify_accent_levels(pitch)
- 
-# Compare accent label sequences using SequenceMatcher
-# This checks: does the HIGH label appear at the same relative positions?
-# If user has Udatta (3) where reference has Anudatta (1) — that's an accent error.
-if len(ref_accent_levels) > 0 and len(user_accent_levels) > 0:
-    accent_sim = SequenceMatcher(
-        None,
-        ref_accent_levels.tolist(),
-        user_accent_levels.tolist()
-    ).ratio() * 100
-else:
-    accent_sim = 0.0
- 
-print("Accent Level Similarity:", round(accent_sim, 2), "%")
  
  
 # =============================================================================
@@ -478,17 +407,6 @@ def shape_sequence_similarity(ref_shapes, user_shapes):
     return score, feedback
  
  
-# Run syllable shape analysis
-ref_shapes  = analyze_syllable_shapes(ref_pitch)
-user_shapes = analyze_syllable_shapes(pitch)
- 
-shape_sim, shape_feedback = shape_sequence_similarity(ref_shapes, user_shapes)
- 
-print("Syllable Shape Similarity:", round(shape_sim, 2), "%")
-print("Ref  shapes:", ref_shapes)
-print("User shapes:", user_shapes)
- 
- 
 # --- Pitch slope similarity ---
 # The Beguš paper: independent svarita = same pitch targets but STEEPER slope
 # So we also compare the rate of pitch change (velocity/slope)
@@ -519,8 +437,6 @@ def pitch_slope_similarity(ref_p, user_p):
     slope_dist = D[-1, -1] / len(wp)
     return 100 * np.exp(-slope_dist / 0.5)
  
-slope_sim = pitch_slope_similarity(ref_pitch, pitch)
- 
 # --- Combined pitch score ---
 # We now have 5 pitch measurements, each from a different research insight:
 #
@@ -542,14 +458,6 @@ slope_sim = pitch_slope_similarity(ref_pitch, pitch)
 #   shape_sim         — intra-syllable pitch shape (rising/falling/circumflex)
 #                       catches: wrong shape on individual syllables
 #                       (from Beguš 2016 — svarita = circumflex within syllable)
- 
-pitch_combined = (
-    0.35 * pitch_similarity +   # overall contour shape (most important)
-    0.25 * zone_sim         +   # Vedic accent zone accuracy
-    0.15 * slope_sim        +   # pitch transition steepness
-    0.15 * accent_sim       +   # frame-level accent label placement
-    0.10 * shape_sim            # intra-syllable pitch shape
-)
 
 # =============================================================================
 # WORD-LEVEL SVARA MAP
@@ -690,12 +598,6 @@ def compare_word_svara_maps(ref_map, user_map):
                       "accent_ok": not accent_wrong, "shape_ok": not shape_wrong,
                       "accent_fix": accent_fix, "shape_fix": shape_fix})
     return items
-
-
-# Build svara maps (needs ref_clean and word_timestamps_data — defined later,
-# so these calls are placed after Section 5 below)
- 
-
 # -------------------------
 # 2. Rhythm similarity
 # (Onset envelope — works for slow chants, no beat needed)
@@ -710,83 +612,9 @@ def get_onset_envelope(y, sr):
     if onset_env.max() > 0:
         onset_env = onset_env / onset_env.max()
     return onset_env
- 
-user_onset = get_onset_envelope(audio, sr)
-ref_onset  = get_onset_envelope(ref_audio, ref_sr)
- 
-# DTW comparison — handles different lengths naturally
-D, wp = dtw(
-    user_onset.reshape(1, -1),
-    ref_onset.reshape(1, -1),
-    metric='euclidean'
-)
-onset_dist       = D[-1, -1] / len(wp)
-tempo_similarity = 100 * np.exp(-onset_dist / 0.3)
-
-# -------------------------
-# 3. Voice similarity (MFCC)
-# -------------------------
-mfcc_scaled = StandardScaler().fit_transform(mfcc.T).T
-ref_mfcc_scaled = StandardScaler().fit_transform(ref_mfcc.T).T
-
-delta = librosa.feature.delta(mfcc_scaled)
-ref_delta = librosa.feature.delta(ref_mfcc_scaled)
-mfcc_combined = np.vstack([mfcc_scaled, delta])
-ref_mfcc_combined = np.vstack([ref_mfcc_scaled, ref_delta])
-
-D, wp = dtw(mfcc_combined, ref_mfcc_combined, metric='euclidean')
-mfcc_distance = D[-1, -1] / len(wp)
-k = 50
-mfcc_similarity = 100 * np.exp(-mfcc_distance / k)
-
 # --------------------------------------------------------
 # 4. Text similarity (No eSpeak / No phonemizer needed)
 # --------------------------------------------------------
-ref_mantra = reference["mantra_text"]
-ref_text   = ref_mantra.lower().strip()
-
-word_timestamps_data = []   # stores {word, start, end} per word — used by svara map
-
-try:
-    from contextlib import asynccontextmanager
-
-@asynccontextmanager
-async def lifespan(app):
-    global model
-    model = whisper.load_model("base")
-    yield
-
-app = FastAPI(lifespan=lifespan)  # medium crashes on CPU; base is sufficient
-    user_result = model.transcribe(
-        "user_chant1.wav",
-        language                   = "en",
-        initial_prompt             = f"Sanskrit mantra: {ref_mantra}",
-        fp16                       = False,   # CPU does not support FP16
-        temperature                = 0.0,
-        best_of                    = 1,
-        beam_size                  = 1,
-        condition_on_previous_text = False,
-        word_timestamps            = True,    # gives per-word start/end seconds
-    )
-    user_text = user_result["text"].lower().strip()
-
-    # Extract per-word timestamps from Whisper segments
-    for segment in user_result.get("segments", []):
-        for w in segment.get("words", []):
-            wc = re.sub(r'[^a-z\s]', '', w["word"].lower()).strip()
-            if wc:
-                word_timestamps_data.append({
-                    "word":  wc,
-                    "start": float(w["start"]),
-                    "end":   float(w["end"]),
-                })
-
-except Exception as e:
-    print(f"Whisper failed: {e} — falling back to reference text")
-    user_text = ref_text
-
-print("Reference text :", ref_text)
-print("User text      :", user_text)
 # -------------------------
 # Clean text
 # -------------------------
@@ -795,12 +623,6 @@ def clean_text(text):
     text = re.sub(r'[^a-z\s]', '', text)
     text = re.sub(r'\s+', ' ', text).strip()
     return text
-
-ref_clean = clean_text(ref_text)
-user_clean = clean_text(user_text)
-
-print("Cleaned reference :", ref_clean)
-print("Cleaned user      :", user_clean)
 
 # -------------------------
 # Sanskrit syllable splitter
@@ -813,49 +635,6 @@ def split_syllables(text):
     Works well for: om, namah, shivaya, ganapataye, etc.
     """
     return re.findall(r'[bcdfghjklmnpqrstvwxyz]*[aeiou]+[bcdfghjklmnpqrstvwxyz]*', text)
-
-ref_syllables  = split_syllables(ref_clean)
-user_syllables = split_syllables(user_clean)
-
-print("Reference syllables :", ref_syllables)
-print("User syllables      :", user_syllables)
-
-# -------------------------
-# 3-level text similarity
-# -------------------------
-
-# Level 1: Full character sequence (catches overall structure)
-char_sim = SequenceMatcher(None, ref_clean, user_clean).ratio()
-
-# Level 2: Word-level (checks if right words spoken)
-ref_words  = ref_clean.split()
-user_words = user_clean.split()
-word_sim = SequenceMatcher(None, ref_words, user_words).ratio()
-
-# Level 3: Syllable-level (best for Sanskrit pronunciation accuracy)
-syl_sim = SequenceMatcher(None, ref_syllables, user_syllables).ratio()
-
-# Weighted combination — syllable similarity weighted highest
-text_similarity = (
-    0.20 * char_sim +
-    0.30 * word_sim +
-    0.50 * syl_sim
-) * 100
-
-print("\nChar similarity     :", round(char_sim * 100, 2), "%")
-print("Word similarity     :", round(word_sim * 100, 2), "%")
-print("Syllable similarity :", round(syl_sim * 100, 2), "%")
-print("Text similarity     :", round(text_similarity, 2), "%")
-
-# -------------------------
-# 5. Overall score
-# -------------------------
-overall = (
-    0.40 * text_similarity  +   # pronunciation accuracy
-    0.25 * mfcc_similarity  +   # voice quality / timbre
-    0.20 * pitch_combined +   # pitch accuracy
-    0.15 * tempo_similarity     # rhythm
-)
 
 # =============================================================================
 # 6. FEEDBACK ENGINE
@@ -871,13 +650,6 @@ overall = (
 #   - praise           : what the user did well (keeps motivation high)
 #   - sadhana_tip      : one focused practice suggestion
 # =============================================================================
- 
-# ---------- helpers ----------------------------------------------------------
- 
-# Build word-level svara maps now that ref_words and word_timestamps_data exist
-ref_svara_map       = build_ref_word_svara_map(ref_pitch, ref_words, ref_audio, ref_sr)
-user_svara_map      = build_word_svara_map(pitch, word_timestamps_data, sr)
-word_svara_feedback = compare_word_svara_maps(ref_svara_map, user_svara_map)
 
 
 def score_to_grade(score):
@@ -1417,30 +1189,6 @@ def generate_full_feedback(
         "sadhana_tip"     : sadhana_tip,
         "all_praises"     : all_praises,
     }
- 
- 
-# =============================================================================
-# 7. RESULTS + FEEDBACK
-# =============================================================================
-print("\n========== RAW SCORES ==========")
-print("Text Similarity  :", round(text_similarity, 2), "%")
-print("Pitch Similarity :", round(pitch_combined, 2), "%")
-print("Rhythm Similarity:", round(tempo_similarity, 2), "%")
-print("Voice Similarity :", round(mfcc_similarity,  2), "%")
-print("Overall Score    :", round(overall, 2), "%")
-print("================================")
- 
-# Run full feedback engine
-feedback_result = generate_full_feedback(
-    text_similarity, pitch_combined, tempo_similarity, mfcc_similarity,
-    pitch_similarity, zone_sim, accent_sim, shape_sim, slope_sim,
-    zone_feedback, shape_feedback,
-    ref_syllables, user_syllables, ref_words, user_words,
-    overall,
-    word_svara_feedback=word_svara_feedback
-)
- 
-
 # =============================================================================
 # 8. ENTRY POINT — called by api.py per request
 # =============================================================================
@@ -1450,6 +1198,7 @@ def analyze_chant(user_audio_path: str) -> dict:
     All functions above are used as-is — nothing is changed.
     Returns the feedback_result dict for the API to serve as JSON.
     """
+    _load_references()
     global audio, sr, pitch, tempo, mfcc   # make these available to feedback functions
                                             # that reference them (e.g. rhythm_feedback)
 
