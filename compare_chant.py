@@ -9,6 +9,7 @@ import re
 from scipy.ndimage import uniform_filter1d         # Smooth pitch curve
 from scipy.signal import find_peaks, resample      # Peak detection, resamp
 import torch
+import os
 # Load Whisper once (shared by direct run and API)
 # ── These are safe at module level (just assignments, no I/O) ──
 WHISPER_MODEL = None   # loaded lazily in _load_references()
@@ -34,7 +35,7 @@ def _load_references():
     WHISPER_MODEL = _whisper.load_model("base")
     print("Whisper ready.")
 
-    with open("reference_features.json", "r") as f:
+    with open(os.path.join(BASE_DIR, "reference_features.json"), "r") as f:
         reference = json.load(f)
 
     ref_pitch  = np.array(reference["pitch_contour"])
@@ -42,7 +43,8 @@ def _load_references():
     ref_mfcc   = np.array(reference["mfcc"])
     ref_mantra = reference["mantra_text"]
 
-    ref_audio_raw, ref_sr_raw = librosa.load("chant1.wav")
+    BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+    ref_audio_raw, ref_sr_raw = librosa.load(os.path.join(BASE_DIR, "chant1.wav"))
     ref_audio_trimmed, _      = librosa.effects.trim(ref_audio_raw)
 
     ref_audio = ref_audio_trimmed
