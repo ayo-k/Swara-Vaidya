@@ -673,7 +673,7 @@ def score_to_emoji(score):
  
 # ---------- per-dimension feedback builders ----------------------------------
  
-def pronunciation_feedback(text_sim, ref_syllables, user_syllables, ref_words, user_words):
+def pronunciation_feedback(text_sim, ref_syllables, user_syllables, ref_words, user_words,  ref_clean="", user_clean=""):
     """
     Ucchāraṇa (उच्चारण) — Pronunciation feedback.
     Finds exactly which syllables or words differ and explains them.
@@ -1051,7 +1051,7 @@ def generate_full_feedback(
  
     # --- collect per-dimension feedback ---
     uc_issues, uc_praises, uc_fixes = pronunciation_feedback(
-        text_sim, ref_syllables, user_syllables, ref_words, user_words
+        text_sim, ref_syllables, user_syllables, ref_words, user_words, ref_clean=clean_text(ref_mantra), user_clean=" ".join(user_words)
     )
     sv_issues, sv_per_word, sv_praises, sv_fixes = pitch_feedback(
         pitch_combined, pitch_similarity, zone_sim, accent_sim,
@@ -1311,9 +1311,9 @@ def analyze_chant(user_audio_path: str) -> dict:
                     })
     except Exception as e:
         print(f"Whisper error: {e}")
-        user_text = ref_text
+        user_text = ref_mantra.lower().strip()
 
-    ref_clean  = clean_text(ref_text)
+    ref_clean  = clean_text(ref_mantra)
     user_clean = clean_text(user_text)
     ref_words  = ref_clean.split()
     user_words = user_clean.split()
