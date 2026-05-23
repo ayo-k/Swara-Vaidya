@@ -43,8 +43,8 @@ def _load_references():
     ref_tempo  = reference["tempo"]
     ref_mfcc   = np.array(reference["mfcc"])
     ref_mantra = reference["mantra_text"]
-
-    ref_audio_raw, ref_sr_raw = librosa.load(os.path.join(BASE_DIR, "chant1.wav"))
+    
+    ref_audio_raw, ref_sr_raw = librosa.load(os.path.join(BASE_DIR, "chant1.wav"), sr=None, mono=True)    
     ref_audio_trimmed, _      = librosa.effects.trim(ref_audio_raw)
 
     ref_audio = ref_audio_trimmed
