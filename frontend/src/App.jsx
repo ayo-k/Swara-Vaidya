@@ -3,7 +3,7 @@ import { useState, useRef, useEffect } from "react";
 // ─── API URL ─────────────────────────────────────────────────────────────────
 // Change this to your Render URL when deploying:
 // const API_URL = "https://svara-vaidya.onrender.com";
-const API_URL = "https://swara-vaidya-1.onrender.com";
+const API_URL = "https://mannatgupta512-svara-vaidya.hf.space";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const gradeColor = (score) => {
