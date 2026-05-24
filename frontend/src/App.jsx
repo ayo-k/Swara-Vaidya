@@ -267,77 +267,154 @@ export default function App() {
 
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div style={{
-      minHeight: "100vh", background: "#0f172a", color: "#f1f5f9",
-      fontFamily: "'Segoe UI', system-ui, sans-serif", padding: "24px 16px"
-    }}>
+    <div
+      style={{
+        minHeight: "100vh",
+        background: "#0f172a",
+        color: "#f1f5f9",
+        fontFamily: "'Segoe UI', system-ui, sans-serif",
+        padding: "24px 16px",
+      }}
+    >
       <div style={{ maxWidth: 740, margin: "0 auto" }}>
-
         {/* ── Header ── */}
         <div style={{ textAlign: "center", marginBottom: 32 }}>
-          <div style={{ fontSize: 48 }}>🪔</div>
-          <h1 style={{
-            fontSize: 30, fontWeight: 900, margin: "8px 0 4px",
-            background: "linear-gradient(135deg, #f59e0b, #ef4444)",
-            WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent"
-          }}>
+          <div style={{ fontSize: 48, marginBottom: 8 }}>🪔</div>
+          <h1
+            style={{
+              fontSize: 30,
+              fontWeight: 900,
+              margin: "0 0 8px",
+              background: "linear-gradient(135deg, #f59e0b, #ef4444)",
+              WebkitBackgroundClip: "text",
+              WebkitTextFillColor: "transparent",
+            }}
+          >
             Svara Vaidya
           </h1>
-          <p style={{ color: "#94a3b8", fontSize: 14, margin: 0 }}>
+          <p style={{ color: "#94a3b8", fontSize: 14, margin: "0 0 12px" }}>
             Vedic Mantra Chanting Analyzer · स्वर वैद्य
           </p>
 
           {/* API status indicator */}
           <div style={{ marginTop: 10 }}>
-            <span style={{
-              fontSize: 11, padding: "3px 10px", borderRadius: 20,
-              background: apiStatus === "ok" ? "#14532d" : apiStatus === "down" ? "#450a0a" : "#1e293b",
-              color: apiStatus === "ok" ? "#86efac" : apiStatus === "down" ? "#fca5a5" : "#94a3b8",
-            }}>
-              {apiStatus === "ok" ? "● API Connected" : apiStatus === "down" ? "● API Offline — start uvicorn" : "● Checking API..."}
+            <span
+              style={{
+                fontSize: 11,
+                padding: "3px 10px",
+                borderRadius: 20,
+                background:
+                  apiStatus === "ok"
+                    ? "#14532d"
+                    : apiStatus === "down"
+                      ? "#450a0a"
+                      : "#1e293b",
+                color:
+                  apiStatus === "ok"
+                    ? "#86efac"
+                    : apiStatus === "down"
+                      ? "#fca5a5"
+                      : "#94a3b8",
+              }}
+            >
+              {apiStatus === "ok"
+                ? "● API Connected"
+                : apiStatus === "down"
+                  ? "● API Offline — start uvicorn"
+                  : "● Checking API..."}
             </span>
           </div>
         </div>
 
         {/* ── Record / Upload card ── */}
-        <div style={{
-          background: "#1e293b", borderRadius: 16, padding: 24, marginBottom: 20
-        }}>
-          <h2 style={{ fontSize: 15, fontWeight: 700, marginBottom: 16, color: "#cbd5e1" }}>
+        <div
+          style={{
+            background: "#1e293b",
+            borderRadius: 16,
+            padding: 24,
+            marginBottom: 20,
+          }}
+        >
+          <h2
+            style={{
+              fontSize: 15,
+              fontWeight: 700,
+              marginBottom: 16,
+              color: "#cbd5e1",
+            }}
+          >
             🎙️ Record or Upload Your Chant
           </h2>
 
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 16 }}>
+          <div
+            style={{
+              display: "flex",
+              gap: 10,
+              flexWrap: "wrap",
+              marginBottom: 16,
+              justifyContent: "center",
+            }}
+          >
             {!recording ? (
-              <button onClick={startRecording} disabled={loading} style={{
-                background: "#dc2626", color: "#fff", border: "none",
-                borderRadius: 10, padding: "11px 22px", fontSize: 14,
-                fontWeight: 700, cursor: loading ? "not-allowed" : "pointer",
-                opacity: loading ? 0.5 : 1
-              }}>
+              <button
+                onClick={startRecording}
+                disabled={loading}
+                style={{
+                  background: "#dc2626",
+                  color: "#fff",
+                  border: "none",
+                  borderRadius: 10,
+                  padding: "11px 22px",
+                  fontSize: 14,
+                  fontWeight: 700,
+                  cursor: loading ? "not-allowed" : "pointer",
+                  opacity: loading ? 0.5 : 1,
+                }}
+              >
                 🔴 Start Recording
               </button>
             ) : (
-              <button onClick={stopRecording} style={{
-                background: "#7f1d1d", color: "#fff",
-                border: "2px solid #dc2626", borderRadius: 10,
-                padding: "11px 22px", fontSize: 14, fontWeight: 700, cursor: "pointer"
-              }}>
+              <button
+                onClick={stopRecording}
+                style={{
+                  background: "#7f1d1d",
+                  color: "#fff",
+                  border: "2px solid #dc2626",
+                  borderRadius: 10,
+                  padding: "11px 22px",
+                  fontSize: 14,
+                  fontWeight: 700,
+                  cursor: "pointer",
+                }}
+              >
                 ⏹ Stop Recording
               </button>
             )}
 
-            <button onClick={() => fileInputRef.current.click()} disabled={loading} style={{
-              background: "#1e40af", color: "#fff", border: "none",
-              borderRadius: 10, padding: "11px 22px", fontSize: 14,
-              fontWeight: 700, cursor: loading ? "not-allowed" : "pointer",
-              opacity: loading ? 0.5 : 1
-            }}>
+            <button
+              onClick={() => fileInputRef.current.click()}
+              disabled={loading}
+              style={{
+                background: "#1e40af",
+                color: "#fff",
+                border: "none",
+                borderRadius: 10,
+                padding: "11px 22px",
+                fontSize: 14,
+                fontWeight: 700,
+                cursor: loading ? "not-allowed" : "pointer",
+                opacity: loading ? 0.5 : 1,
+              }}
+            >
               📁 Upload Audio
             </button>
-            <input ref={fileInputRef} type="file"
-              accept=".wav,.mp3,.m4a,.ogg,.flac" style={{ display: "none" }}
-              onChange={handleFile} />
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".wav,.mp3,.m4a,.ogg,.flac"
+              style={{ display: "none" }}
+              onChange={handleFile}
+            />
           </div>
 
           {recording && (
@@ -347,26 +424,42 @@ export default function App() {
           )}
 
           {audioURL && (
-            <audio controls src={audioURL}
-              style={{ width: "100%", borderRadius: 8, marginBottom: 14 }} />
+            <audio
+              controls
+              src={audioURL}
+              style={{ width: "100%", borderRadius: 8, marginBottom: 14 }}
+            />
           )}
 
           {audioBlob && !loading && !recording && (
-            <button onClick={analyze} style={{
-              background: "linear-gradient(135deg, #f59e0b, #ef4444)",
-              color: "#fff", border: "none", borderRadius: 10,
-              padding: "14px 0", fontSize: 16, fontWeight: 800,
-              cursor: "pointer", width: "100%"
-            }}>
+            <button
+              onClick={analyze}
+              style={{
+                background: "linear-gradient(135deg, #f59e0b, #ef4444)",
+                color: "#fff",
+                border: "none",
+                borderRadius: 10,
+                padding: "14px 0",
+                fontSize: 16,
+                fontWeight: 800,
+                cursor: "pointer",
+                width: "100%",
+              }}
+            >
               🔍 Analyze Chant
             </button>
           )}
 
           {loading && (
-            <div style={{
-              background: "#0f172a", borderRadius: 10, padding: 24,
-              textAlign: "center", color: "#94a3b8"
-            }}>
+            <div
+              style={{
+                background: "#0f172a",
+                borderRadius: 10,
+                padding: 24,
+                textAlign: "center",
+                color: "#94a3b8",
+              }}
+            >
               <div style={{ fontSize: 36, marginBottom: 8 }}>🔄</div>
               <div style={{ fontSize: 14 }}>Analyzing your chant...</div>
               <div style={{ fontSize: 12, marginTop: 4, color: "#475569" }}>
@@ -376,11 +469,17 @@ export default function App() {
           )}
 
           {error && (
-            <div style={{
-              background: "#450a0a", border: "1px solid #991b1b",
-              borderRadius: 10, padding: 14, color: "#fca5a5",
-              fontSize: 13, marginTop: 12
-            }}>
+            <div
+              style={{
+                background: "#450a0a",
+                border: "1px solid #991b1b",
+                borderRadius: 10,
+                padding: 14,
+                color: "#fca5a5",
+                fontSize: 13,
+                marginTop: 12,
+              }}
+            >
               ❌ {error}
             </div>
           )}
@@ -390,37 +489,69 @@ export default function App() {
         {r && (
           <>
             {/* Overall score card */}
-            <div style={{
-              background: "#1e293b", borderRadius: 16, padding: 24,
-              marginBottom: 16, textAlign: "center"
-            }}>
+            <div
+              style={{
+                background: "#1e293b",
+                borderRadius: 16,
+                padding: 24,
+                marginBottom: 16,
+                textAlign: "center",
+              }}
+            >
               <div style={{ fontSize: 13, color: "#64748b", marginBottom: 4 }}>
                 Mantra: <strong style={{ color: "#f1f5f9" }}>{r.mantra}</strong>
               </div>
               {r.user_transcript && (
-                <div style={{ fontSize: 13, color: "#64748b", marginBottom: 16 }}>
-                  Whisper heard: <em style={{ color: "#cbd5e1" }}>"{r.user_transcript}"</em>
+                <div
+                  style={{ fontSize: 13, color: "#64748b", marginBottom: 16 }}
+                >
+                  Whisper heard:{" "}
+                  <em style={{ color: "#cbd5e1" }}>"{r.user_transcript}"</em>
                 </div>
               )}
-              <div style={{
-                fontSize: 72, fontWeight: 900, lineHeight: 1,
-                color: gradeColor(r.overall_score || sc.overall || 0)
-              }}>
+              <div
+                style={{
+                  fontSize: 72,
+                  fontWeight: 900,
+                  lineHeight: 1,
+                  color: gradeColor(r.overall_score || sc.overall || 0),
+                }}
+              >
                 {r.overall_score || sc.overall || 0}%
               </div>
               <div style={{ fontSize: 26, marginTop: 8 }}>
-                <span style={{ color: "#f1f5f9", fontWeight: 800 }}>{r.overall_grade}</span>
+                <span style={{ color: "#f1f5f9", fontWeight: 800 }}>
+                  {r.overall_grade}
+                </span>
                 <span style={{ fontSize: 13, color: "#64748b", marginLeft: 8 }}>
-                  {r.overall_grade === "Uttama" ? "Excellent" :
-                   r.overall_grade === "Madhyama" ? "Good — keep practicing" :
-                   r.overall_grade === "Adi" ? "Foundation level" : "Just starting"}
+                  {r.overall_grade === "Uttama"
+                    ? "Excellent"
+                    : r.overall_grade === "Madhyama"
+                      ? "Good — keep practicing"
+                      : r.overall_grade === "Adi"
+                        ? "Foundation level"
+                        : "Just starting"}
                 </span>
               </div>
             </div>
 
             {/* Dimension score bars */}
-            <div style={{ background: "#1e293b", borderRadius: 16, padding: 24, marginBottom: 16 }}>
-              <h2 style={{ fontSize: 15, fontWeight: 700, marginBottom: 18, color: "#cbd5e1" }}>
+            <div
+              style={{
+                background: "#1e293b",
+                borderRadius: 16,
+                padding: 24,
+                marginBottom: 16,
+              }}
+            >
+              <h2
+                style={{
+                  fontSize: 15,
+                  fontWeight: 700,
+                  marginBottom: 18,
+                  color: "#cbd5e1",
+                }}
+              >
                 📊 Dimension Scores
               </h2>
 
@@ -437,12 +568,35 @@ export default function App() {
                 score={d.svara?.score ?? sc.pitch_combined ?? 0}
               />
               {/* Svara sub-scores */}
-              <div style={{ paddingLeft: 20, borderLeft: "2px solid #334155", marginBottom: 14 }}>
-                <ScoreBar label="↳ Contour shape"    score={sc.pitch_breakdown?.contour_shape    ?? d.svara?.score ?? 0} />
-                <ScoreBar label="↳ Zone accuracy"    score={sc.pitch_breakdown?.zone_accuracy    ?? 0} />
-                <ScoreBar label="↳ Accent placement" score={sc.pitch_breakdown?.accent_placement ?? 0} />
-                <ScoreBar label="↳ Syllable shape"   score={sc.pitch_breakdown?.syllable_shape   ?? 0} />
-                <ScoreBar label="↳ Slope/steepness"  score={sc.pitch_breakdown?.slope_steepness  ?? 0} />
+              <div
+                style={{
+                  paddingLeft: 20,
+                  borderLeft: "2px solid #334155",
+                  marginBottom: 14,
+                }}
+              >
+                <ScoreBar
+                  label="↳ Contour shape"
+                  score={
+                    sc.pitch_breakdown?.contour_shape ?? d.svara?.score ?? 0
+                  }
+                />
+                <ScoreBar
+                  label="↳ Zone accuracy"
+                  score={sc.pitch_breakdown?.zone_accuracy ?? 0}
+                />
+                <ScoreBar
+                  label="↳ Accent placement"
+                  score={sc.pitch_breakdown?.accent_placement ?? 0}
+                />
+                <ScoreBar
+                  label="↳ Syllable shape"
+                  score={sc.pitch_breakdown?.syllable_shape ?? 0}
+                />
+                <ScoreBar
+                  label="↳ Slope/steepness"
+                  score={sc.pitch_breakdown?.slope_steepness ?? 0}
+                />
               </div>
               <ScoreBar
                 label="🥁 Laya (Rhythm / Tempo)"
@@ -452,32 +606,78 @@ export default function App() {
 
             {/* Priority focus areas */}
             {r.priority && r.priority.length > 0 && (
-              <div style={{ background: "#1e293b", borderRadius: 16, padding: 24, marginBottom: 16 }}>
-                <h2 style={{ fontSize: 15, fontWeight: 700, marginBottom: 16, color: "#cbd5e1" }}>
+              <div
+                style={{
+                  background: "#1e293b",
+                  borderRadius: 16,
+                  padding: 24,
+                  marginBottom: 16,
+                }}
+              >
+                <h2
+                  style={{
+                    fontSize: 15,
+                    fontWeight: 700,
+                    marginBottom: 16,
+                    color: "#cbd5e1",
+                  }}
+                >
                   🎯 Focus Areas (fix these first)
                 </h2>
                 {r.priority.map((p, i) => (
-                  <div key={i} style={{
-                    display: "flex", justifyContent: "space-between", alignItems: "center",
-                    padding: "10px 0",
-                    borderBottom: i < r.priority.length - 1 ? "1px solid #1e293b" : "none"
-                  }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                      <span style={{
-                        background: i === 0 ? "#dc2626" : i === 1 ? "#f59e0b" : "#334155",
-                        color: "#fff", borderRadius: 20, width: 24, height: 24,
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                        fontSize: 12, fontWeight: 800, flexShrink: 0
-                      }}>
+                  <div
+                    key={i}
+                    style={{
+                      display: "flex",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                      padding: "10px 0",
+                      borderBottom:
+                        i < r.priority.length - 1
+                          ? "1px solid #1e293b"
+                          : "none",
+                    }}
+                  >
+                    <div
+                      style={{ display: "flex", alignItems: "center", gap: 10 }}
+                    >
+                      <span
+                        style={{
+                          background:
+                            i === 0
+                              ? "#dc2626"
+                              : i === 1
+                                ? "#f59e0b"
+                                : "#334155",
+                          color: "#fff",
+                          borderRadius: 20,
+                          width: 24,
+                          height: 24,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          fontSize: 12,
+                          fontWeight: 800,
+                          flexShrink: 0,
+                        }}
+                      >
                         {i + 1}
                       </span>
                       <span style={{ fontSize: 14 }}>{p.dimension}</span>
                     </div>
                     <div style={{ textAlign: "right" }}>
-                      <div style={{ fontSize: 14, fontWeight: 700, color: gradeColor(p.score) }}>
+                      <div
+                        style={{
+                          fontSize: 14,
+                          fontWeight: 700,
+                          color: gradeColor(p.score),
+                        }}
+                      >
                         {p.score}%
                       </div>
-                      <div style={{ fontSize: 11, color: "#475569" }}>impact: {p.impact}</div>
+                      <div style={{ fontSize: 11, color: "#475569" }}>
+                        impact: {p.impact}
+                      </div>
                     </div>
                   </div>
                 ))}
@@ -486,15 +686,30 @@ export default function App() {
 
             {/* What you did well */}
             {r.all_praises && r.all_praises.length > 0 && (
-              <div style={{
-                background: "#052e16", border: "1px solid #16a34a",
-                borderRadius: 16, padding: 20, marginBottom: 16
-              }}>
-                <h2 style={{ fontSize: 15, fontWeight: 700, marginBottom: 12, color: "#86efac" }}>
+              <div
+                style={{
+                  background: "#052e16",
+                  border: "1px solid #16a34a",
+                  borderRadius: 16,
+                  padding: 20,
+                  marginBottom: 16,
+                }}
+              >
+                <h2
+                  style={{
+                    fontSize: 15,
+                    fontWeight: 700,
+                    marginBottom: 12,
+                    color: "#86efac",
+                  }}
+                >
                   ✨ Sādhu! — What You Did Well
                 </h2>
                 {r.all_praises.map((p, i) => (
-                  <div key={i} style={{ fontSize: 13, color: "#bbf7d0", marginBottom: 6 }}>
+                  <div
+                    key={i}
+                    style={{ fontSize: 13, color: "#bbf7d0", marginBottom: 6 }}
+                  >
                     ✓ {p}
                   </div>
                 ))}
@@ -502,12 +717,42 @@ export default function App() {
             )}
 
             {/* ── Detail tabs ── */}
-            <div style={{ background: "#1e293b", borderRadius: 16, padding: 24, marginBottom: 16 }}>
-              <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
-                <Tab label="🎵 Svara"      active={activeTab === "svara"}      onClick={() => setActiveTab("svara")} />
-                <Tab label="🔤 Ucchāraṇa" active={activeTab === "uccharana"}  onClick={() => setActiveTab("uccharana")} />
-                <Tab label="🥁 Laya"       active={activeTab === "laya"}       onClick={() => setActiveTab("laya")} />
-                <Tab label="🔔 Nāda"       active={activeTab === "nada"}       onClick={() => setActiveTab("nada")} />
+            <div
+              style={{
+                background: "#1e293b",
+                borderRadius: 16,
+                padding: 24,
+                marginBottom: 16,
+              }}
+            >
+              <div
+                style={{
+                  display: "flex",
+                  gap: 8,
+                  marginBottom: 20,
+                  flexWrap: "wrap",
+                }}
+              >
+                <Tab
+                  label="🎵 Svara"
+                  active={activeTab === "svara"}
+                  onClick={() => setActiveTab("svara")}
+                />
+                <Tab
+                  label="🔤 Ucchāraṇa"
+                  active={activeTab === "uccharana"}
+                  onClick={() => setActiveTab("uccharana")}
+                />
+                <Tab
+                  label="🥁 Laya"
+                  active={activeTab === "laya"}
+                  onClick={() => setActiveTab("laya")}
+                />
+                <Tab
+                  label="🔔 Nāda"
+                  active={activeTab === "nada"}
+                  onClick={() => setActiveTab("nada")}
+                />
               </div>
 
               {/* ── SVARA TAB ── */}
@@ -516,30 +761,54 @@ export default function App() {
                   {/* Summary issues from pitch_feedback() */}
                   {d.svara?.issues && d.svara.issues.length > 0 && (
                     <div style={{ marginBottom: 16 }}>
-                      <div style={{ fontSize: 13, color: "#94a3b8", marginBottom: 8 }}>Summary:</div>
+                      <div
+                        style={{
+                          fontSize: 13,
+                          color: "#94a3b8",
+                          marginBottom: 8,
+                        }}
+                      >
+                        Summary:
+                      </div>
                       <FeedbackList items={d.svara.issues} />
                     </div>
                   )}
 
                   {/* Word-by-word breakdown — from svara_word_detail */}
-                  <div style={{ fontSize: 13, color: "#94a3b8", marginBottom: 10 }}>
+                  <div
+                    style={{ fontSize: 13, color: "#94a3b8", marginBottom: 10 }}
+                  >
                     Word-by-word Svara Breakdown:
                   </div>
                   {wordDetail.length === 0 ? (
-                    <div style={{
-                      background: "#052e16", border: "1px solid #16a34a",
-                      borderRadius: 10, padding: 14, color: "#86efac", fontSize: 14
-                    }}>
+                    <div
+                      style={{
+                        background: "#052e16",
+                        border: "1px solid #16a34a",
+                        borderRadius: 10,
+                        padding: 14,
+                        color: "#86efac",
+                        fontSize: 14,
+                      }}
+                    >
                       ✅ All words have correct svara accent and shape!
                     </div>
                   ) : (
-                    wordDetail.map((item, i) => <WordCard key={i} item={item} />)
+                    wordDetail.map((item, i) => (
+                      <WordCard key={i} item={item} />
+                    ))
                   )}
 
                   {/* Zone feedback */}
                   {d.svara?.fixes && d.svara.fixes.length > 0 && (
                     <div style={{ marginTop: 16 }}>
-                      <div style={{ fontSize: 13, color: "#94a3b8", marginBottom: 8 }}>
+                      <div
+                        style={{
+                          fontSize: 13,
+                          color: "#94a3b8",
+                          marginBottom: 8,
+                        }}
+                      >
                         General practice techniques:
                       </div>
                       <FeedbackList items={d.svara.fixes} />
@@ -552,33 +821,75 @@ export default function App() {
               {activeTab === "uccharana" && (
                 <div>
                   {/* Sub-scores */}
-                  <div style={{ display: "flex", gap: 10, marginBottom: 16, flexWrap: "wrap" }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      gap: 10,
+                      marginBottom: 16,
+                      flexWrap: "wrap",
+                    }}
+                  >
                     {[
                       ["Char", sc.text_similarity],
                       ["Word", d.uccharana?.word_sim],
                       ["Syllable", d.uccharana?.syl_sim],
-                    ].map(([label, val]) => val != null && (
-                      <div key={label} style={{
-                        background: "#0f172a", borderRadius: 10,
-                        padding: "12px 16px", flex: 1, minWidth: 80
-                      }}>
-                        <div style={{ fontSize: 11, color: "#64748b" }}>{label}</div>
-                        <div style={{
-                          fontSize: 22, fontWeight: 800,
-                          color: gradeColor(val)
-                        }}>{Math.round(val)}%</div>
-                      </div>
-                    ))}
+                    ].map(
+                      ([label, val]) =>
+                        val != null && (
+                          <div
+                            key={label}
+                            style={{
+                              background: "#0f172a",
+                              borderRadius: 10,
+                              padding: "12px 16px",
+                              flex: 1,
+                              minWidth: 80,
+                            }}
+                          >
+                            <div style={{ fontSize: 11, color: "#64748b" }}>
+                              {label}
+                            </div>
+                            <div
+                              style={{
+                                fontSize: 22,
+                                fontWeight: 800,
+                                color: gradeColor(val),
+                              }}
+                            >
+                              {Math.round(val)}%
+                            </div>
+                          </div>
+                        ),
+                    )}
                   </div>
 
                   {/* Issues */}
                   {d.uccharana?.issues && d.uccharana.issues.length > 0 ? (
                     <div style={{ marginBottom: 14 }}>
-                      <div style={{ fontSize: 13, color: "#94a3b8", marginBottom: 8 }}>Issues:</div>
-                      <FeedbackList items={d.uccharana.issues} bg="#2d0f0f" border="#dc2626" color="#fca5a5" />
+                      <div
+                        style={{
+                          fontSize: 13,
+                          color: "#94a3b8",
+                          marginBottom: 8,
+                        }}
+                      >
+                        Issues:
+                      </div>
+                      <FeedbackList
+                        items={d.uccharana.issues}
+                        bg="#2d0f0f"
+                        border="#dc2626"
+                        color="#fca5a5"
+                      />
                     </div>
                   ) : (
-                    <div style={{ color: "#22c55e", fontSize: 14, marginBottom: 14 }}>
+                    <div
+                      style={{
+                        color: "#22c55e",
+                        fontSize: 14,
+                        marginBottom: 14,
+                      }}
+                    >
                       ✅ No pronunciation issues detected
                     </div>
                   )}
@@ -586,7 +897,15 @@ export default function App() {
                   {/* Fixes */}
                   {d.uccharana?.fixes && d.uccharana.fixes.length > 0 && (
                     <div>
-                      <div style={{ fontSize: 13, color: "#94a3b8", marginBottom: 8 }}>How to improve:</div>
+                      <div
+                        style={{
+                          fontSize: 13,
+                          color: "#94a3b8",
+                          marginBottom: 8,
+                        }}
+                      >
+                        How to improve:
+                      </div>
                       <FeedbackList items={d.uccharana.fixes} />
                     </div>
                   )}
@@ -597,33 +916,71 @@ export default function App() {
               {activeTab === "laya" && (
                 <div>
                   <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
-                    <div style={{
-                      background: "#0f172a", borderRadius: 10,
-                      padding: "14px 20px", flex: 1, textAlign: "center"
-                    }}>
-                      <div style={{ fontSize: 11, color: "#64748b", marginBottom: 4 }}>Rhythm Score</div>
-                      <div style={{
-                        fontSize: 36, fontWeight: 900,
-                        color: gradeColor(d.laya?.score ?? 0)
-                      }}>
+                    <div
+                      style={{
+                        background: "#0f172a",
+                        borderRadius: 10,
+                        padding: "14px 20px",
+                        flex: 1,
+                        textAlign: "center",
+                      }}
+                    >
+                      <div
+                        style={{
+                          fontSize: 11,
+                          color: "#64748b",
+                          marginBottom: 4,
+                        }}
+                      >
+                        Rhythm Score
+                      </div>
+                      <div
+                        style={{
+                          fontSize: 36,
+                          fontWeight: 900,
+                          color: gradeColor(d.laya?.score ?? 0),
+                        }}
+                      >
                         {d.laya?.score ?? 0}%
                       </div>
                     </div>
                     {d.laya?.duration_ratio != null && (
-                      <div style={{
-                        background: "#0f172a", borderRadius: 10,
-                        padding: "14px 20px", flex: 1, textAlign: "center"
-                      }}>
-                        <div style={{ fontSize: 11, color: "#64748b", marginBottom: 4 }}>Duration vs Reference</div>
-                        <div style={{
-                          fontSize: 36, fontWeight: 900,
-                          color: Math.abs(d.laya.duration_ratio - 1) < 0.15 ? "#22c55e" : "#f97316"
-                        }}>
+                      <div
+                        style={{
+                          background: "#0f172a",
+                          borderRadius: 10,
+                          padding: "14px 20px",
+                          flex: 1,
+                          textAlign: "center",
+                        }}
+                      >
+                        <div
+                          style={{
+                            fontSize: 11,
+                            color: "#64748b",
+                            marginBottom: 4,
+                          }}
+                        >
+                          Duration vs Reference
+                        </div>
+                        <div
+                          style={{
+                            fontSize: 36,
+                            fontWeight: 900,
+                            color:
+                              Math.abs(d.laya.duration_ratio - 1) < 0.15
+                                ? "#22c55e"
+                                : "#f97316",
+                          }}
+                        >
                           {d.laya.duration_ratio}×
                         </div>
                         <div style={{ fontSize: 11, color: "#64748b" }}>
-                          {d.laya.duration_ratio > 1.15 ? "Too slow — speed up" :
-                           d.laya.duration_ratio < 0.85 ? "Too fast — slow down" : "Good pace ✓"}
+                          {d.laya.duration_ratio > 1.15
+                            ? "Too slow — speed up"
+                            : d.laya.duration_ratio < 0.85
+                              ? "Too fast — slow down"
+                              : "Good pace ✓"}
                         </div>
                       </div>
                     )}
@@ -631,18 +988,41 @@ export default function App() {
 
                   {d.laya?.issues && d.laya.issues.length > 0 && (
                     <div style={{ marginBottom: 14 }}>
-                      <div style={{ fontSize: 13, color: "#94a3b8", marginBottom: 8 }}>Issues:</div>
-                      <FeedbackList items={d.laya.issues} bg="#2d0f0f" border="#dc2626" color="#fca5a5" />
+                      <div
+                        style={{
+                          fontSize: 13,
+                          color: "#94a3b8",
+                          marginBottom: 8,
+                        }}
+                      >
+                        Issues:
+                      </div>
+                      <FeedbackList
+                        items={d.laya.issues}
+                        bg="#2d0f0f"
+                        border="#dc2626"
+                        color="#fca5a5"
+                      />
                     </div>
                   )}
                   {d.laya?.fixes && d.laya.fixes.length > 0 && (
                     <div>
-                      <div style={{ fontSize: 13, color: "#94a3b8", marginBottom: 8 }}>How to improve:</div>
+                      <div
+                        style={{
+                          fontSize: 13,
+                          color: "#94a3b8",
+                          marginBottom: 8,
+                        }}
+                      >
+                        How to improve:
+                      </div>
                       <FeedbackList items={d.laya.fixes} />
                     </div>
                   )}
                   {(!d.laya?.issues || d.laya.issues.length === 0) && (
-                    <div style={{ color: "#22c55e", fontSize: 14 }}>✅ Laya is steady — good rhythmic flow</div>
+                    <div style={{ color: "#22c55e", fontSize: 14 }}>
+                      ✅ Laya is steady — good rhythmic flow
+                    </div>
                   )}
                 </div>
               )}
@@ -650,33 +1030,76 @@ export default function App() {
               {/* ── NADA TAB ── */}
               {activeTab === "nada" && (
                 <div>
-                  <div style={{
-                    background: "#0f172a", borderRadius: 10,
-                    padding: 20, textAlign: "center", marginBottom: 16
-                  }}>
-                    <div style={{ fontSize: 11, color: "#64748b", marginBottom: 4 }}>Voice Quality Score</div>
-                    <div style={{
-                      fontSize: 56, fontWeight: 900,
-                      color: gradeColor(d.nada?.score ?? 0)
-                    }}>
+                  <div
+                    style={{
+                      background: "#0f172a",
+                      borderRadius: 10,
+                      padding: 20,
+                      textAlign: "center",
+                      marginBottom: 16,
+                    }}
+                  >
+                    <div
+                      style={{
+                        fontSize: 11,
+                        color: "#64748b",
+                        marginBottom: 4,
+                      }}
+                    >
+                      Voice Quality Score
+                    </div>
+                    <div
+                      style={{
+                        fontSize: 56,
+                        fontWeight: 900,
+                        color: gradeColor(d.nada?.score ?? 0),
+                      }}
+                    >
                       {d.nada?.score ?? 0}%
                     </div>
                   </div>
 
                   {d.nada?.issues && d.nada.issues.length > 0 ? (
                     <div style={{ marginBottom: 14 }}>
-                      <div style={{ fontSize: 13, color: "#94a3b8", marginBottom: 8 }}>Issues:</div>
-                      <FeedbackList items={d.nada.issues} bg="#2d0f0f" border="#dc2626" color="#fca5a5" />
+                      <div
+                        style={{
+                          fontSize: 13,
+                          color: "#94a3b8",
+                          marginBottom: 8,
+                        }}
+                      >
+                        Issues:
+                      </div>
+                      <FeedbackList
+                        items={d.nada.issues}
+                        bg="#2d0f0f"
+                        border="#dc2626"
+                        color="#fca5a5"
+                      />
                     </div>
                   ) : (
-                    <div style={{ color: "#22c55e", fontSize: 14, marginBottom: 14 }}>
+                    <div
+                      style={{
+                        color: "#22c55e",
+                        fontSize: 14,
+                        marginBottom: 14,
+                      }}
+                    >
                       ✅ Nāda quality is authentic
                     </div>
                   )}
 
                   {d.nada?.fixes && d.nada.fixes.length > 0 && (
                     <div>
-                      <div style={{ fontSize: 13, color: "#94a3b8", marginBottom: 8 }}>How to improve:</div>
+                      <div
+                        style={{
+                          fontSize: 13,
+                          color: "#94a3b8",
+                          marginBottom: 8,
+                        }}
+                      >
+                        How to improve:
+                      </div>
                       <FeedbackList items={d.nada.fixes} />
                     </div>
                   )}
@@ -684,7 +1107,9 @@ export default function App() {
                   {d.nada?.praises && d.nada.praises.length > 0 && (
                     <div style={{ marginTop: 12 }}>
                       {d.nada.praises.map((p, i) => (
-                        <div key={i} style={{ fontSize: 13, color: "#86efac" }}>✓ {p}</div>
+                        <div key={i} style={{ fontSize: 13, color: "#86efac" }}>
+                          ✓ {p}
+                        </div>
                       ))}
                     </div>
                   )}
@@ -693,25 +1118,50 @@ export default function App() {
             </div>
 
             {/* Sadhana tip */}
-            <div style={{
-              background: "linear-gradient(135deg, #1c1917, #292524)",
-              border: "1px solid #92400e", borderRadius: 16, padding: 24, marginBottom: 32
-            }}>
+            <div
+              style={{
+                background: "linear-gradient(135deg, #1c1917, #292524)",
+                border: "1px solid #92400e",
+                borderRadius: 16,
+                padding: 24,
+                marginBottom: 32,
+              }}
+            >
               <div style={{ fontSize: 24, marginBottom: 8 }}>🪔</div>
-              <h3 style={{ fontSize: 14, fontWeight: 800, color: "#fbbf24", marginBottom: 8 }}>
+              <h3
+                style={{
+                  fontSize: 14,
+                  fontWeight: 800,
+                  color: "#fbbf24",
+                  marginBottom: 8,
+                }}
+              >
                 Daily Sādhana Recommendation
               </h3>
-              <p style={{ fontSize: 14, color: "#d6d3d1", lineHeight: 1.7, margin: 0 }}>
+              <p
+                style={{
+                  fontSize: 14,
+                  color: "#d6d3d1",
+                  lineHeight: 1.7,
+                  margin: 0,
+                }}
+              >
                 {r.sadhana_tip}
               </p>
             </div>
           </>
         )}
 
-        <div style={{ textAlign: "center", color: "#1e293b", fontSize: 13, paddingBottom: 16 }}>
+        <div
+          style={{
+            textAlign: "center",
+            color: "#1e293b",
+            fontSize: 13,
+            paddingBottom: 16,
+          }}
+        >
           ॐ शान्तिः शान्तिः शान्तिः
         </div>
-
       </div>
     </div>
   );
