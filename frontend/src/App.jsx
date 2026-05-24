@@ -279,12 +279,12 @@ export default function App() {
       <div style={{ maxWidth: 740, margin: "0 auto" }}>
         {/* ── Header ── */}
         <div style={{ textAlign: "center", marginBottom: 32 }}>
-          <div style={{ fontSize: 48, marginBottom: 8 }}>🪔</div>
+          <div style={{ fontSize: 36, marginBottom: 6 }}>🪔</div>
           <h1
             style={{
-              fontSize: 30,
+              fontSize: 22,
               fontWeight: 900,
-              margin: "0 0 8px",
+              margin: "0 0 6px",
               background: "linear-gradient(135deg, #f59e0b, #ef4444)",
               WebkitBackgroundClip: "text",
               WebkitTextFillColor: "transparent",
@@ -292,7 +292,7 @@ export default function App() {
           >
             Svara Vaidya
           </h1>
-          <p style={{ color: "#94a3b8", fontSize: 14, margin: "0 0 12px" }}>
+          <p style={{ color: "#94a3b8", fontSize: 13, margin: "0 0 10px" }}>
             Vedic Mantra Chanting Analyzer · स्वर वैद्य
           </p>
 
