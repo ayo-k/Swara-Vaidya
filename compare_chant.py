@@ -9,6 +9,7 @@ import re
 from scipy.ndimage import uniform_filter1d         # Smooth pitch curve
 from scipy.signal import find_peaks, resample      # Peak detection, resamp
 import torch
+import soundfile as sf
 import os
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 # Load Whisper once (shared by direct run and API)
@@ -44,7 +45,10 @@ def _load_references():
     ref_mfcc   = np.array(reference["mfcc"])
     ref_mantra = reference["mantra_text"]
     
-    ref_audio_raw, ref_sr_raw = librosa.load(os.path.join(BASE_DIR, "chant1.wav"), sr=None, mono=True)    
+    ref_audio_raw, ref_sr_raw = sf.read(os.path.join(BASE_DIR, "chant1.wav"))
+    ref_audio_raw = ref_audio_raw.astype(float)
+    if ref_audio_raw.ndim > 1:
+        ref_audio_raw = ref_audio_raw.mean(axis=1)  # stereo to mono
     ref_audio_trimmed, _      = librosa.effects.trim(ref_audio_raw)
 
     ref_audio = ref_audio_trimmed
