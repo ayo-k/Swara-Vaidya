@@ -454,7 +454,7 @@ export default function App() {
                   borderRadius: 2,
                   marginBottom: 18,
                   border: "1px solid #b5a88a",
-                  backgroundColor: "#d4c9b5",
+                  backgroundColor: "#c89435",
                   filter: "sepia(0.3) contrast(1.1)",
                 }}
               />
