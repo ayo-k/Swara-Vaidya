@@ -227,11 +227,15 @@ export default function App() {
 
       <div style={{
         minHeight: "100vh",
-        background: "#f5f1eb",
+        backgroundImage: "url('/svarab.png')",
+        backgroundSize: "cover",
+        backgroundPosition: "center top",
+        backgroundAttachment: "fixed",
+        backgroundColor: "#f5f1eb",
         color: "#1a1614",
         fontFamily: "'Crimson Text', Georgia, serif",
         padding: "0 0 60px"
-      }}>
+        }}>
 
         {/* ── Top bar ── */}
         <div style={{
