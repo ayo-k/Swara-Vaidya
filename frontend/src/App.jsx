@@ -1,124 +1,89 @@
 import { useState, useRef, useEffect } from "react";
 
-// ─── API URL ─────────────────────────────────────────────────────────────────
-// Change this to your Render URL when deploying:
-// const API_URL = "https://svara-vaidya.onrender.com";
 const API_URL = "https://mannatgupta512-svara-vaidya.hf.space";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 const gradeColor = (score) => {
-  if (score >= 85) return "#22c55e";
-  if (score >= 70) return "#f59e0b";
-  if (score >= 50) return "#f97316";
-  return "#ef4444";
+  if (score >= 85) return "#2d6a4f";
+  if (score >= 70) return "#b5621a";
+  if (score >= 50) return "#c2410c";
+  return "#991b1b";
 };
 
 const gradeEmoji = (score) => {
-  if (score >= 85) return "✅";
-  if (score >= 70) return "🔶";
-  if (score >= 50) return "⚠️";
-  return "❌";
+  if (score >= 85) return "✓";
+  if (score >= 70) return "◐";
+  if (score >= 50) return "△";
+  return "✗";
 };
 
-// ─── Score bar component ──────────────────────────────────────────────────────
+// ─── Score bar ────────────────────────────────────────────────────────────────
 const ScoreBar = ({ label, score, sublabel }) => (
-  <div style={{ marginBottom: 14 }}>
-    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-      <span style={{ fontSize: 13, color: "#cbd5e1" }}>{label}</span>
-      <span style={{ fontSize: 13, fontWeight: 700, color: gradeColor(score) }}>
+  <div style={{ marginBottom: 18 }}>
+    <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 6 }}>
+      <span style={{ fontSize: 13, color: "#4a4540", fontFamily: "'Crimson Text', Georgia, serif", letterSpacing: "0.01em" }}>{label}</span>
+      <span style={{ fontSize: 13, fontWeight: 600, color: gradeColor(score), fontFamily: "monospace" }}>
         {score}% {gradeEmoji(score)}
       </span>
     </div>
-    <div style={{ background: "#0f172a", borderRadius: 6, height: 8 }}>
+    <div style={{ background: "#e8e2d9", borderRadius: 2, height: 4 }}>
       <div style={{
-        width: `${Math.min(score, 100)}%`, height: 8, borderRadius: 6,
-        background: gradeColor(score), transition: "width 1s ease"
+        width: `${Math.min(score, 100)}%`, height: 4, borderRadius: 2,
+        background: gradeColor(score), transition: "width 1.2s cubic-bezier(0.4,0,0.2,1)"
       }} />
     </div>
-    {sublabel && (
-      <div style={{ fontSize: 11, color: "#64748b", marginTop: 3 }}>{sublabel}</div>
-    )}
+    {sublabel && <div style={{ fontSize: 11, color: "#9c9189", marginTop: 4 }}>{sublabel}</div>}
   </div>
 );
 
 // ─── Word svara card ──────────────────────────────────────────────────────────
-// Matches the word_svara_feedback list from compare_word_svara_maps()
-// Each item has: word, word_num, ref_accent, user_accent, ref_shape,
-//                user_shape, accent_ok, shape_ok, accent_fix, shape_fix
 const WordCard = ({ item }) => {
   const ok = item.accent_ok && item.shape_ok;
   return (
     <div style={{
-      background: ok ? "#052e16" : "#2d0f0f",
-      border: `1px solid ${ok ? "#16a34a" : "#991b1b"}`,
-      borderRadius: 10, padding: "12px 16px", marginBottom: 10
+      background: ok ? "#f0f7f4" : "#fdf4f4",
+      border: `1px solid ${ok ? "#a8d5c2" : "#e8b4b4"}`,
+      borderRadius: 4, padding: "14px 18px", marginBottom: 10
     }}>
-      {/* Word header */}
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: ok ? 0 : 10 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: ok ? 0 : 12 }}>
         <span style={{
-          background: ok ? "#16a34a" : "#991b1b",
-          color: "#fff", borderRadius: 20, padding: "2px 10px",
-          fontSize: 12, fontWeight: 700
+          background: ok ? "#2d6a4f" : "#991b1b",
+          color: "#fff", borderRadius: 2, padding: "2px 10px",
+          fontSize: 11, fontWeight: 600, letterSpacing: "0.05em", textTransform: "uppercase"
         }}>
           Word {item.word_num}
         </span>
-        <span style={{ fontSize: 17, fontWeight: 800, color: "#f1f5f9" }}>
+        <span style={{ fontSize: 17, fontWeight: 700, color: "#1a1614", fontFamily: "'Crimson Text', Georgia, serif" }}>
           '{item.word}'
         </span>
-        <span style={{ marginLeft: "auto", fontSize: 18 }}>{ok ? "✅" : "❌"}</span>
+        <span style={{ marginLeft: "auto", fontSize: 14, color: ok ? "#2d6a4f" : "#991b1b" }}>{ok ? "✓" : "✗"}</span>
       </div>
-
-      {/* Accent error */}
       {!item.accent_ok && (
-        <div style={{ marginBottom: 8 }}>
-          <div style={{ fontSize: 12, color: "#94a3b8", marginBottom: 4 }}>
-            <span style={{ color: "#f87171", fontWeight: 700 }}>Accent</span>
-            {"  "}Expected{" "}
-            <span style={{
-              background: "#14532d", color: "#86efac",
-              padding: "1px 8px", borderRadius: 4, fontWeight: 700
-            }}>{item.ref_accent}</span>
-            {"  "}You sang{" "}
-            <span style={{
-              background: "#450a0a", color: "#fca5a5",
-              padding: "1px 8px", borderRadius: 4, fontWeight: 700
-            }}>{item.user_accent}</span>
+        <div style={{ marginBottom: 10 }}>
+          <div style={{ fontSize: 12, color: "#6b5c52", marginBottom: 6, fontFamily: "'Crimson Text', Georgia, serif" }}>
+            <span style={{ color: "#991b1b", fontWeight: 600 }}>Accent — </span>
+            Expected <span style={{ background: "#e8f5ef", color: "#2d6a4f", padding: "1px 7px", borderRadius: 2, fontWeight: 600 }}>{item.ref_accent}</span>
+            {"  "}·{"  "}
+            Sung <span style={{ background: "#fef2f2", color: "#991b1b", padding: "1px 7px", borderRadius: 2, fontWeight: 600 }}>{item.user_accent}</span>
           </div>
           {item.accent_fix && (
-            <div style={{
-              background: "#1e3a5f", borderLeft: "3px solid #3b82f6",
-              padding: "8px 12px", borderRadius: 6,
-              fontSize: 12, color: "#bfdbfe", lineHeight: 1.6
-            }}>
-              💡 {item.accent_fix}
+            <div style={{ background: "#f8f6f0", borderLeft: "3px solid #b5621a", padding: "10px 14px", borderRadius: 2, fontSize: 12, color: "#4a3728", lineHeight: 1.7, fontFamily: "'Crimson Text', Georgia, serif" }}>
+              {item.accent_fix}
             </div>
           )}
         </div>
       )}
-
-      {/* Shape error */}
       {!item.shape_ok && (
         <div>
-          <div style={{ fontSize: 12, color: "#94a3b8", marginBottom: 4 }}>
-            <span style={{ color: "#f87171", fontWeight: 700 }}>Shape</span>
-            {"  "}Expected{" "}
-            <span style={{
-              background: "#14532d", color: "#86efac",
-              padding: "1px 8px", borderRadius: 4, fontWeight: 700
-            }}>{item.ref_shape}</span>
-            {"  "}You sang{" "}
-            <span style={{
-              background: "#450a0a", color: "#fca5a5",
-              padding: "1px 8px", borderRadius: 4, fontWeight: 700
-            }}>{item.user_shape}</span>
+          <div style={{ fontSize: 12, color: "#6b5c52", marginBottom: 6, fontFamily: "'Crimson Text', Georgia, serif" }}>
+            <span style={{ color: "#991b1b", fontWeight: 600 }}>Shape — </span>
+            Expected <span style={{ background: "#e8f5ef", color: "#2d6a4f", padding: "1px 7px", borderRadius: 2, fontWeight: 600 }}>{item.ref_shape}</span>
+            {"  "}·{"  "}
+            Sung <span style={{ background: "#fef2f2", color: "#991b1b", padding: "1px 7px", borderRadius: 2, fontWeight: 600 }}>{item.user_shape}</span>
           </div>
           {item.shape_fix && (
-            <div style={{
-              background: "#1e3a5f", borderLeft: "3px solid #3b82f6",
-              padding: "8px 12px", borderRadius: 6,
-              fontSize: 12, color: "#bfdbfe", lineHeight: 1.6
-            }}>
-              💡 {item.shape_fix}
+            <div style={{ background: "#f8f6f0", borderLeft: "3px solid #b5621a", padding: "10px 14px", borderRadius: 2, fontSize: 12, color: "#4a3728", lineHeight: 1.7, fontFamily: "'Crimson Text', Georgia, serif" }}>
+              {item.shape_fix}
             </div>
           )}
         </div>
@@ -127,16 +92,18 @@ const WordCard = ({ item }) => {
   );
 };
 
-// ─── Feedback bullet list ─────────────────────────────────────────────────────
-const FeedbackList = ({ items, color = "#bfdbfe", bg = "#1e3a5f", border = "#3b82f6" }) => (
+// ─── Feedback list ────────────────────────────────────────────────────────────
+const FeedbackList = ({ items, variant = "default" }) => (
   <>
     {items.map((item, i) => (
       <div key={i} style={{
-        background: bg, borderLeft: `3px solid ${border}`,
-        padding: "8px 12px", borderRadius: 6,
-        fontSize: 13, color, lineHeight: 1.6, marginBottom: 6
+        background: variant === "error" ? "#fdf4f4" : "#f8f6f0",
+        borderLeft: `3px solid ${variant === "error" ? "#c9a0a0" : "#b5a88a"}`,
+        padding: "10px 14px", borderRadius: 2,
+        fontSize: 13, color: "#3d3028", lineHeight: 1.75, marginBottom: 8,
+        fontFamily: "'Crimson Text', Georgia, serif"
       }}>
-        • {item}
+        {item}
       </div>
     ))}
   </>
@@ -145,14 +112,27 @@ const FeedbackList = ({ items, color = "#bfdbfe", bg = "#1e3a5f", border = "#3b8
 // ─── Tab button ───────────────────────────────────────────────────────────────
 const Tab = ({ label, active, onClick }) => (
   <button onClick={onClick} style={{
-    padding: "8px 18px", borderRadius: 8, border: "none",
-    cursor: "pointer", fontSize: 13, fontWeight: 600,
-    background: active ? "#3b82f6" : "#1e293b",
-    color: active ? "#fff" : "#94a3b8",
-    transition: "all 0.2s"
+    padding: "7px 16px", borderRadius: 2,
+    border: active ? "1px solid #8b7355" : "1px solid #ddd6cc",
+    cursor: "pointer", fontSize: 12, fontWeight: 600,
+    background: active ? "#8b7355" : "#faf8f5",
+    color: active ? "#fff" : "#6b5c52",
+    transition: "all 0.15s ease",
+    letterSpacing: "0.04em",
+    textTransform: "uppercase",
+    fontFamily: "'Crimson Text', Georgia, serif"
   }}>
     {label}
   </button>
+);
+
+// ─── Divider ──────────────────────────────────────────────────────────────────
+const Divider = ({ label }) => (
+  <div style={{ display: "flex", alignItems: "center", gap: 14, margin: "28px 0 20px" }}>
+    <div style={{ flex: 1, height: 1, background: "#e0d8d0" }} />
+    {label && <span style={{ fontSize: 10, color: "#b0a898", letterSpacing: "0.12em", textTransform: "uppercase", fontWeight: 600 }}>{label}</span>}
+    <div style={{ flex: 1, height: 1, background: "#e0d8d0" }} />
+  </div>
 );
 
 // ─── Main App ─────────────────────────────────────────────────────────────────
@@ -164,28 +144,24 @@ export default function App() {
   const [result,     setResult]     = useState(null);
   const [error,      setError]      = useState(null);
   const [activeTab,  setActiveTab]  = useState("svara");
-  const [apiStatus,  setApiStatus]  = useState("checking"); // checking | ok | down
+  const [apiStatus,  setApiStatus]  = useState("checking");
 
-  const mediaRef    = useRef(null);
-  const chunksRef   = useRef([]);
+  const mediaRef     = useRef(null);
+  const chunksRef    = useRef([]);
   const fileInputRef = useRef(null);
 
-  // ── Keep backend alive + check status ──────────────────────────────────────
   useEffect(() => {
     const check = async () => {
       try {
         const r = await fetch(`${API_URL}/health`);
         setApiStatus(r.ok ? "ok" : "down");
-      } catch {
-        setApiStatus("down");
-      }
+      } catch { setApiStatus("down"); }
     };
     check();
-    const interval = setInterval(check, 600000); // ping every 10 min
+    const interval = setInterval(check, 600000);
     return () => clearInterval(interval);
   }, []);
 
-  // ── Microphone recording ───────────────────────────────────────────────────
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -194,17 +170,12 @@ export default function App() {
       mr.ondataavailable = (e) => chunksRef.current.push(e.data);
       mr.onstop = () => {
         const blob = new Blob(chunksRef.current, { type: "audio/wav" });
-        setAudioBlob(blob);
-        setAudioURL(URL.createObjectURL(blob));
+        setAudioBlob(blob); setAudioURL(URL.createObjectURL(blob));
         stream.getTracks().forEach(t => t.stop());
-        setResult(null);
-        setError(null);
+        setResult(null); setError(null);
       };
-      mr.start();
-      mediaRef.current = mr;
-      setRecording(true);
-      setResult(null);
-      setError(null);
+      mr.start(); mediaRef.current = mr;
+      setRecording(true); setResult(null); setError(null);
     } catch {
       setError("Microphone access denied. Please allow microphone permission in your browser.");
     }
@@ -214,30 +185,16 @@ export default function App() {
     if (mediaRef.current) { mediaRef.current.stop(); setRecording(false); }
   };
 
-  // ── File upload ────────────────────────────────────────────────────────────
   const handleFile = (e) => {
     const file = e.target.files[0];
     if (!file) return;
-    setAudioBlob(file);
-    setAudioURL(URL.createObjectURL(file));
-    setResult(null);
-    setError(null);
+    setAudioBlob(file); setAudioURL(URL.createObjectURL(file));
+    setResult(null); setError(null);
   };
 
-  // ── Analyze ────────────────────────────────────────────────────────────────
-  // Sends audio to POST /analyze
-  // Response structure matches generate_full_feedback() return dict:
-  //   result.mantra, result.overall_score, result.overall_grade
-  //   result.dimensions.uccharana / svara / laya / nada
-  //   result.svara_word_detail   ← word-by-word breakdown
-  //   result.scores              ← all numeric scores
-  //   result.priority            ← ranked focus areas
-  //   result.sadhana_tip
-  //   result.all_praises
   const analyze = async () => {
     if (!audioBlob) return;
-    setLoading(true);
-    setError(null);
+    setLoading(true); setError(null);
     try {
       const form = new FormData();
       form.append("file", audioBlob, "user_chant.wav");
@@ -247,922 +204,392 @@ export default function App() {
         throw new Error(err.detail || "Analysis failed");
       }
       const data = await resp.json();
-      setResult(data);
-      setActiveTab("svara");
-    } catch (e) {
-      setError(e.message);
-    } finally {
-      setLoading(false);
-    }
+      setResult(data); setActiveTab("svara");
+    } catch (e) { setError(e.message); }
+    finally { setLoading(false); }
   };
 
-  // ── Shortcuts ──────────────────────────────────────────────────────────────
   const r  = result;
-  // scores come from result.scores (added by analyze_chant())
   const sc = r?.scores || {};
-  // dimensions come from generate_full_feedback() return dict
   const d  = r?.dimensions || {};
-  // word-level svara breakdown
   const wordDetail = r?.svara_word_detail || [];
 
-  // ── Render ─────────────────────────────────────────────────────────────────
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: "#0f172a",
-        color: "#f1f5f9",
-        fontFamily: "'Segoe UI', system-ui, sans-serif",
-        padding: "24px 16px",
-      }}
-    >
-      <div style={{ maxWidth: 740, margin: "0 auto" }}>
-        {/* ── Header ── */}
-        <div style={{ textAlign: "center", marginBottom: 32 }}>
-          <div style={{ fontSize: 36, marginBottom: 6 }}>🪔</div>
-          <h1
-            style={{
-              fontSize: 22,
-              fontWeight: 900,
-              margin: "0 0 6px",
-              background: "linear-gradient(135deg, #f59e0b, #ef4444)",
-              WebkitBackgroundClip: "text",
-              WebkitTextFillColor: "transparent",
-            }}
-          >
-            Svara Vaidya
-          </h1>
-          <p style={{ color: "#94a3b8", fontSize: 13, margin: "0 0 10px" }}>
-            Vedic Mantra Chanting Analyzer · स्वर वैद्य
-          </p>
+    <>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Crimson+Text:ital,wght@0,400;0,600;0,700;1,400&family=Cormorant+Garamond:wght@300;400;500;600&display=swap');
+        * { box-sizing: border-box; }
+        body { margin: 0; background: #f5f1eb; }
+        audio { filter: sepia(0.1); }
+        audio::-webkit-media-controls-panel { background: #f0ebe3; }
+        button:hover { opacity: 0.88; }
+      `}</style>
 
-          {/* API status indicator */}
-          <div style={{ marginTop: 10 }}>
-            <span
-              style={{
-                fontSize: 11,
-                padding: "3px 10px",
-                borderRadius: 20,
-                background:
-                  apiStatus === "ok"
-                    ? "#14532d"
-                    : apiStatus === "down"
-                      ? "#450a0a"
-                      : "#1e293b",
-                color:
-                  apiStatus === "ok"
-                    ? "#86efac"
-                    : apiStatus === "down"
-                      ? "#fca5a5"
-                      : "#94a3b8",
-              }}
-            >
-              {apiStatus === "ok"
-                ? "● API Connected"
-                : apiStatus === "down"
-                  ? "● API Offline — start uvicorn"
-                  : "● Checking API..."}
-            </span>
-          </div>
+      <div style={{
+        minHeight: "100vh",
+        background: "#f5f1eb",
+        color: "#1a1614",
+        fontFamily: "'Crimson Text', Georgia, serif",
+        padding: "0 0 60px"
+      }}>
+
+        {/* ── Top bar ── */}
+        <div style={{
+          borderBottom: "1px solid #ddd6cc",
+          background: "#faf8f5",
+          padding: "12px 24px",
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center"
+        }}>
+          <span style={{ fontSize: 11, color: "#9c9189", letterSpacing: "0.12em", textTransform: "uppercase", fontWeight: 600 }}>
+            Svara Vaidya · स्वर वैद्य
+          </span>
+          <span style={{
+            fontSize: 11, padding: "3px 10px", borderRadius: 2,
+            background: apiStatus === "ok" ? "#e8f5ef" : apiStatus === "down" ? "#fef2f2" : "#f5f1eb",
+            color: apiStatus === "ok" ? "#2d6a4f" : apiStatus === "down" ? "#991b1b" : "#9c9189",
+            border: `1px solid ${apiStatus === "ok" ? "#a8d5c2" : apiStatus === "down" ? "#e8b4b4" : "#ddd6cc"}`,
+            letterSpacing: "0.06em"
+          }}>
+            {apiStatus === "ok" ? "● Connected" : apiStatus === "down" ? "● Offline" : "● Checking"}
+          </span>
         </div>
 
-        {/* ── Record / Upload card ── */}
-        <div
-          style={{
-            background: "#1e293b",
-            borderRadius: 16,
-            padding: 24,
-            marginBottom: 20,
-          }}
-        >
-          <h2
-            style={{
-              fontSize: 15,
-              fontWeight: 700,
-              marginBottom: 16,
-              color: "#cbd5e1",
-            }}
-          >
-            🎙️ Record or Upload Your Chant
-          </h2>
+        <div style={{ maxWidth: 680, margin: "0 auto", padding: "0 20px" }}>
 
-          <div
-            style={{
-              display: "flex",
-              gap: 10,
-              flexWrap: "wrap",
-              marginBottom: 16,
-              justifyContent: "center",
-            }}
-          >
-            {!recording ? (
-              <button
-                onClick={startRecording}
-                disabled={loading}
-                style={{
-                  background: "#dc2626",
-                  color: "#fff",
-                  border: "none",
-                  borderRadius: 10,
-                  padding: "11px 22px",
-                  fontSize: 14,
-                  fontWeight: 700,
-                  cursor: loading ? "not-allowed" : "pointer",
-                  opacity: loading ? 0.5 : 1,
-                }}
-              >
-                🔴 Start Recording
-              </button>
-            ) : (
-              <button
-                onClick={stopRecording}
-                style={{
-                  background: "#7f1d1d",
-                  color: "#fff",
-                  border: "2px solid #dc2626",
-                  borderRadius: 10,
-                  padding: "11px 22px",
-                  fontSize: 14,
-                  fontWeight: 700,
-                  cursor: "pointer",
-                }}
-              >
-                ⏹ Stop Recording
-              </button>
-            )}
+          {/* ── Header ── */}
+          <div style={{ textAlign: "center", padding: "56px 0 40px", borderBottom: "1px solid #ddd6cc" }}>
+            <div style={{ fontSize: 13, letterSpacing: "0.18em", textTransform: "uppercase", color: "#9c9189", fontWeight: 600, marginBottom: 16 }}>
+              Vedic Mantra Chanting Analyzer
+            </div>
+            <h1 style={{
+              fontFamily: "'Cormorant Garamond', Georgia, serif",
+              fontSize: 52, fontWeight: 300, margin: "0 0 8px",
+              color: "#1a1614", letterSpacing: "-0.02em", lineHeight: 1
+            }}>
+              Svara Vaidya
+            </h1>
+            <p style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 20, color: "#6b5c52", margin: 0, fontWeight: 400, fontStyle: "italic" }}>
+              स्वर वैद्य — The Voice Healer
+            </p>
+          </div>
 
-            <button
-              onClick={() => fileInputRef.current.click()}
-              disabled={loading}
-              style={{
-                background: "#1e40af",
-                color: "#fff",
-                border: "none",
-                borderRadius: 10,
-                padding: "11px 22px",
-                fontSize: 14,
-                fontWeight: 700,
+          {/* ── Record / Upload card ── */}
+          <div style={{ padding: "36px 0 0" }}>
+            <div style={{ fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", color: "#9c9189", fontWeight: 600, marginBottom: 20 }}>
+              01 · Record or Upload
+            </div>
+
+            <div style={{ display: "flex", gap: 10, flexWrap: "wrap", marginBottom: 20, justifyContent: "center" }}>
+              {!recording ? (
+                <button onClick={startRecording} disabled={loading} style={{
+                  background: loading ? "#e8e2d9" : "#1a1614",
+                  color: loading ? "#9c9189" : "#faf8f5",
+                  border: "none", borderRadius: 2,
+                  padding: "12px 28px", fontSize: 13,
+                  fontWeight: 600, cursor: loading ? "not-allowed" : "pointer",
+                  letterSpacing: "0.06em", textTransform: "uppercase",
+                  fontFamily: "'Crimson Text', Georgia, serif"
+                }}>
+                  ● Record
+                </button>
+              ) : (
+                <button onClick={stopRecording} style={{
+                  background: "#faf8f5", color: "#991b1b",
+                  border: "2px solid #991b1b", borderRadius: 2,
+                  padding: "12px 28px", fontSize: 13, fontWeight: 600,
+                  cursor: "pointer", letterSpacing: "0.06em", textTransform: "uppercase",
+                  fontFamily: "'Crimson Text', Georgia, serif"
+                }}>
+                  ■ Stop
+                </button>
+              )}
+
+              <button onClick={() => fileInputRef.current.click()} disabled={loading} style={{
+                background: "#faf8f5", color: "#4a4540",
+                border: "1px solid #c8c0b4", borderRadius: 2,
+                padding: "12px 28px", fontSize: 13, fontWeight: 600,
                 cursor: loading ? "not-allowed" : "pointer",
                 opacity: loading ? 0.5 : 1,
-              }}
-            >
-              📁 Upload Audio
-            </button>
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".wav,.mp3,.m4a,.ogg,.flac"
-              style={{ display: "none" }}
-              onChange={handleFile}
-            />
+                letterSpacing: "0.06em", textTransform: "uppercase",
+                fontFamily: "'Crimson Text', Georgia, serif"
+              }}>
+                Upload Audio
+              </button>
+              <input ref={fileInputRef} type="file" accept=".wav,.mp3,.m4a,.ogg,.flac" style={{ display: "none" }} onChange={handleFile} />
+            </div>
+
+            {recording && (
+              <div style={{ textAlign: "center", color: "#991b1b", fontSize: 13, marginBottom: 16, letterSpacing: "0.04em" }}>
+                Recording in progress — chant your mantra, then press Stop
+              </div>
+            )}
+
+            {audioURL && (
+              <audio controls src={audioURL} style={{ width: "100%", borderRadius: 2, marginBottom: 18, border: "1px solid #ddd6cc" }} />
+            )}
+
+            {audioBlob && !loading && !recording && (
+              <button onClick={analyze} style={{
+                background: "#8b7355", color: "#faf8f5",
+                border: "none", borderRadius: 2,
+                padding: "15px 0", fontSize: 14, fontWeight: 600,
+                cursor: "pointer", width: "100%",
+                letterSpacing: "0.08em", textTransform: "uppercase",
+                fontFamily: "'Crimson Text', Georgia, serif"
+              }}>
+                Analyse Chant
+              </button>
+            )}
+
+            {loading && (
+              <div style={{ background: "#faf8f5", border: "1px solid #ddd6cc", borderRadius: 2, padding: "28px 24px", textAlign: "center" }}>
+                <div style={{ fontSize: 13, color: "#6b5c52", marginBottom: 6, letterSpacing: "0.04em" }}>Analysing your chant...</div>
+                <div style={{ fontSize: 12, color: "#9c9189" }}>Whisper transcription + pitch analysis — 15 to 30 seconds</div>
+              </div>
+            )}
+
+            {error && (
+              <div style={{ background: "#fdf4f4", border: "1px solid #e8b4b4", borderRadius: 2, padding: 14, color: "#7f1d1d", fontSize: 13, marginTop: 14, fontFamily: "'Crimson Text', Georgia, serif" }}>
+                {error}
+              </div>
+            )}
           </div>
 
-          {recording && (
-            <div style={{ color: "#f87171", fontSize: 13, marginBottom: 10 }}>
-              ● Recording... chant your mantra now, then press Stop
-            </div>
-          )}
+          {/* ── Results ── */}
+          {r && (
+            <>
+              <Divider label="Analysis Results" />
 
-          {audioURL && (
-            <audio
-              controls
-              src={audioURL}
-              style={{ width: "100%", borderRadius: 8, marginBottom: 14 }}
-            />
-          )}
-
-          {audioBlob && !loading && !recording && (
-            <button
-              onClick={analyze}
-              style={{
-                background: "linear-gradient(135deg, #f59e0b, #ef4444)",
-                color: "#fff",
-                border: "none",
-                borderRadius: 10,
-                padding: "14px 0",
-                fontSize: 16,
-                fontWeight: 800,
-                cursor: "pointer",
-                width: "100%",
-              }}
-            >
-              🔍 Analyze Chant
-            </button>
-          )}
-
-          {loading && (
-            <div
-              style={{
-                background: "#0f172a",
-                borderRadius: 10,
-                padding: 24,
-                textAlign: "center",
-                color: "#94a3b8",
-              }}
-            >
-              <div style={{ fontSize: 36, marginBottom: 8 }}>🔄</div>
-              <div style={{ fontSize: 14 }}>Analyzing your chant...</div>
-              <div style={{ fontSize: 12, marginTop: 4, color: "#475569" }}>
-                Whisper transcription + pitch analysis may take 15–30 seconds
-              </div>
-            </div>
-          )}
-
-          {error && (
-            <div
-              style={{
-                background: "#450a0a",
-                border: "1px solid #991b1b",
-                borderRadius: 10,
-                padding: 14,
-                color: "#fca5a5",
-                fontSize: 13,
-                marginTop: 12,
-              }}
-            >
-              ❌ {error}
-            </div>
-          )}
-        </div>
-
-        {/* ── Results ── */}
-        {r && (
-          <>
-            {/* Overall score card */}
-            <div
-              style={{
-                background: "#1e293b",
-                borderRadius: 16,
-                padding: 24,
-                marginBottom: 16,
-                textAlign: "center",
-              }}
-            >
-              <div style={{ fontSize: 13, color: "#64748b", marginBottom: 4 }}>
-                Mantra: <strong style={{ color: "#f1f5f9" }}>{r.mantra}</strong>
-              </div>
-              {r.user_transcript && (
-                <div
-                  style={{ fontSize: 13, color: "#64748b", marginBottom: 16 }}
-                >
-                  Whisper heard:{" "}
-                  <em style={{ color: "#cbd5e1" }}>"{r.user_transcript}"</em>
-                </div>
-              )}
-              <div
-                style={{
-                  fontSize: 72,
-                  fontWeight: 900,
-                  lineHeight: 1,
-                  color: gradeColor(r.overall_score || sc.overall || 0),
-                }}
-              >
-                {r.overall_score || sc.overall || 0}%
-              </div>
-              <div style={{ fontSize: 26, marginTop: 8 }}>
-                <span style={{ color: "#f1f5f9", fontWeight: 800 }}>
-                  {r.overall_grade}
-                </span>
-                <span style={{ fontSize: 13, color: "#64748b", marginLeft: 8 }}>
-                  {r.overall_grade === "Uttama"
-                    ? "Excellent"
-                    : r.overall_grade === "Madhyama"
-                      ? "Good — keep practicing"
-                      : r.overall_grade === "Adi"
-                        ? "Foundation level"
-                        : "Just starting"}
-                </span>
-              </div>
-            </div>
-
-            {/* Dimension score bars */}
-            <div
-              style={{
-                background: "#1e293b",
-                borderRadius: 16,
-                padding: 24,
-                marginBottom: 16,
-              }}
-            >
-              <h2
-                style={{
-                  fontSize: 15,
-                  fontWeight: 700,
-                  marginBottom: 18,
-                  color: "#cbd5e1",
-                }}
-              >
-                📊 Dimension Scores
-              </h2>
-
-              <ScoreBar
-                label="🔤 Ucchāraṇa (Pronunciation)"
-                score={d.uccharana?.score ?? sc.text_similarity ?? 0}
-              />
-              <ScoreBar
-                label="🔔 Nāda (Voice Quality)"
-                score={d.nada?.score ?? sc.mfcc_similarity ?? 0}
-              />
-              <ScoreBar
-                label="🎵 Svara (Pitch / Accent)"
-                score={d.svara?.score ?? sc.pitch_combined ?? 0}
-              />
-              {/* Svara sub-scores */}
-              <div
-                style={{
-                  paddingLeft: 20,
-                  borderLeft: "2px solid #334155",
-                  marginBottom: 14,
-                }}
-              >
-                <ScoreBar
-                  label="↳ Contour shape"
-                  score={
-                    sc.pitch_breakdown?.contour_shape ?? d.svara?.score ?? 0
-                  }
-                />
-                <ScoreBar
-                  label="↳ Zone accuracy"
-                  score={sc.pitch_breakdown?.zone_accuracy ?? 0}
-                />
-                <ScoreBar
-                  label="↳ Accent placement"
-                  score={sc.pitch_breakdown?.accent_placement ?? 0}
-                />
-                <ScoreBar
-                  label="↳ Syllable shape"
-                  score={sc.pitch_breakdown?.syllable_shape ?? 0}
-                />
-                <ScoreBar
-                  label="↳ Slope/steepness"
-                  score={sc.pitch_breakdown?.slope_steepness ?? 0}
-                />
-              </div>
-              <ScoreBar
-                label="🥁 Laya (Rhythm / Tempo)"
-                score={d.laya?.score ?? sc.tempo_similarity ?? 0}
-              />
-            </div>
-
-            {/* Priority focus areas */}
-            {r.priority && r.priority.length > 0 && (
-              <div
-                style={{
-                  background: "#1e293b",
-                  borderRadius: 16,
-                  padding: 24,
-                  marginBottom: 16,
-                }}
-              >
-                <h2
-                  style={{
-                    fontSize: 15,
-                    fontWeight: 700,
-                    marginBottom: 16,
-                    color: "#cbd5e1",
-                  }}
-                >
-                  🎯 Focus Areas (fix these first)
-                </h2>
-                {r.priority.map((p, i) => (
-                  <div
-                    key={i}
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "center",
-                      padding: "10px 0",
-                      borderBottom:
-                        i < r.priority.length - 1
-                          ? "1px solid #1e293b"
-                          : "none",
-                    }}
-                  >
-                    <div
-                      style={{ display: "flex", alignItems: "center", gap: 10 }}
-                    >
-                      <span
-                        style={{
-                          background:
-                            i === 0
-                              ? "#dc2626"
-                              : i === 1
-                                ? "#f59e0b"
-                                : "#334155",
-                          color: "#fff",
-                          borderRadius: 20,
-                          width: 24,
-                          height: 24,
-                          display: "flex",
-                          alignItems: "center",
-                          justifyContent: "center",
-                          fontSize: 12,
-                          fontWeight: 800,
-                          flexShrink: 0,
-                        }}
-                      >
-                        {i + 1}
+              {/* Overall score */}
+              <div style={{ background: "#faf8f5", border: "1px solid #ddd6cc", borderRadius: 2, padding: "28px 28px 24px", marginBottom: 16 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                  <div>
+                    <div style={{ fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", color: "#9c9189", fontWeight: 600, marginBottom: 8 }}>
+                      Resonance Score
+                    </div>
+                    <div style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 64, fontWeight: 300, lineHeight: 1, color: gradeColor(r.overall_score || sc.overall || 0) }}>
+                      {r.overall_score || sc.overall || 0}
+                      <span style={{ fontSize: 28 }}>%</span>
+                    </div>
+                    <div style={{ marginTop: 8 }}>
+                      <span style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 22, fontWeight: 500, color: "#1a1614" }}>{r.overall_grade}</span>
+                      <span style={{ fontSize: 13, color: "#9c9189", marginLeft: 10, fontStyle: "italic" }}>
+                        {r.overall_grade === "Uttama" ? "Excellent — high acoustic fidelity"
+                         : r.overall_grade === "Madhyama" ? "Good — minor errors present"
+                         : r.overall_grade === "Adi" ? "Foundation level — practice needed"
+                         : "Beginning stage"}
                       </span>
-                      <span style={{ fontSize: 14 }}>{p.dimension}</span>
-                    </div>
-                    <div style={{ textAlign: "right" }}>
-                      <div
-                        style={{
-                          fontSize: 14,
-                          fontWeight: 700,
-                          color: gradeColor(p.score),
-                        }}
-                      >
-                        {p.score}%
-                      </div>
-                      <div style={{ fontSize: 11, color: "#475569" }}>
-                        impact: {p.impact}
-                      </div>
                     </div>
                   </div>
-                ))}
-              </div>
-            )}
+                </div>
 
-            {/* What you did well */}
-            {r.all_praises && r.all_praises.length > 0 && (
-              <div
-                style={{
-                  background: "#052e16",
-                  border: "1px solid #16a34a",
-                  borderRadius: 16,
-                  padding: 20,
-                  marginBottom: 16,
-                }}
-              >
-                <h2
-                  style={{
-                    fontSize: 15,
-                    fontWeight: 700,
-                    marginBottom: 12,
-                    color: "#86efac",
-                  }}
-                >
-                  ✨ Sādhu! — What You Did Well
-                </h2>
-                {r.all_praises.map((p, i) => (
-                  <div
-                    key={i}
-                    style={{ fontSize: 13, color: "#bbf7d0", marginBottom: 6 }}
-                  >
-                    ✓ {p}
+                {r.user_transcript && (
+                  <div style={{ marginTop: 18, paddingTop: 18, borderTop: "1px solid #e8e2d9" }}>
+                    <span style={{ fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", color: "#9c9189", fontWeight: 600 }}>Mantra — </span>
+                    <span style={{ fontSize: 14, color: "#4a4540", fontStyle: "italic" }}>{r.mantra}</span>
+                    <span style={{ fontSize: 11, color: "#b0a898", margin: "0 8px" }}>·</span>
+                    <span style={{ fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", color: "#9c9189", fontWeight: 600 }}>Heard — </span>
+                    <span style={{ fontSize: 14, color: "#4a4540", fontStyle: "italic" }}>"{r.user_transcript}"</span>
                   </div>
-                ))}
-              </div>
-            )}
-
-            {/* ── Detail tabs ── */}
-            <div
-              style={{
-                background: "#1e293b",
-                borderRadius: 16,
-                padding: 24,
-                marginBottom: 16,
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  gap: 8,
-                  marginBottom: 20,
-                  flexWrap: "wrap",
-                }}
-              >
-                <Tab
-                  label="🎵 Svara"
-                  active={activeTab === "svara"}
-                  onClick={() => setActiveTab("svara")}
-                />
-                <Tab
-                  label="🔤 Ucchāraṇa"
-                  active={activeTab === "uccharana"}
-                  onClick={() => setActiveTab("uccharana")}
-                />
-                <Tab
-                  label="🥁 Laya"
-                  active={activeTab === "laya"}
-                  onClick={() => setActiveTab("laya")}
-                />
-                <Tab
-                  label="🔔 Nāda"
-                  active={activeTab === "nada"}
-                  onClick={() => setActiveTab("nada")}
-                />
+                )}
               </div>
 
-              {/* ── SVARA TAB ── */}
-              {activeTab === "svara" && (
-                <div>
-                  {/* Summary issues from pitch_feedback() */}
-                  {d.svara?.issues && d.svara.issues.length > 0 && (
-                    <div style={{ marginBottom: 16 }}>
-                      <div
-                        style={{
-                          fontSize: 13,
-                          color: "#94a3b8",
-                          marginBottom: 8,
-                        }}
-                      >
-                        Summary:
-                      </div>
-                      <FeedbackList items={d.svara.issues} />
-                    </div>
-                  )}
+              {/* Dimension scores */}
+              <div style={{ background: "#faf8f5", border: "1px solid #ddd6cc", borderRadius: 2, padding: "24px 28px", marginBottom: 16 }}>
+                <div style={{ fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", color: "#9c9189", fontWeight: 600, marginBottom: 20 }}>
+                  Dimension Scores
+                </div>
+                <ScoreBar label="Ucchāraṇa — Pronunciation" score={d.uccharana?.score ?? sc.text_similarity ?? 0} />
+                <ScoreBar label="Nāda — Voice Quality" score={d.nada?.score ?? sc.mfcc_similarity ?? 0} />
+                <ScoreBar label="Svara — Pitch & Accent" score={d.svara?.score ?? sc.pitch_combined ?? 0} />
+                <div style={{ paddingLeft: 16, borderLeft: "1px solid #e8e2d9", marginBottom: 18 }}>
+                  <ScoreBar label="↳ Contour shape"    score={sc.pitch_breakdown?.contour_shape    ?? d.svara?.score ?? 0} />
+                  <ScoreBar label="↳ Zone accuracy"    score={sc.pitch_breakdown?.zone_accuracy    ?? 0} />
+                  <ScoreBar label="↳ Accent placement" score={sc.pitch_breakdown?.accent_placement ?? 0} />
+                  <ScoreBar label="↳ Syllable shape"   score={sc.pitch_breakdown?.syllable_shape   ?? 0} />
+                  <ScoreBar label="↳ Slope / steepness" score={sc.pitch_breakdown?.slope_steepness ?? 0} />
+                </div>
+                <ScoreBar label="Laya — Rhythm & Tempo" score={d.laya?.score ?? sc.tempo_similarity ?? 0} />
+              </div>
 
-                  {/* Word-by-word breakdown — from svara_word_detail */}
-                  <div
-                    style={{ fontSize: 13, color: "#94a3b8", marginBottom: 10 }}
-                  >
-                    Word-by-word Svara Breakdown:
+              {/* Priority focus areas */}
+              {r.priority && r.priority.length > 0 && (
+                <div style={{ background: "#faf8f5", border: "1px solid #ddd6cc", borderRadius: 2, padding: "24px 28px", marginBottom: 16 }}>
+                  <div style={{ fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", color: "#9c9189", fontWeight: 600, marginBottom: 18 }}>
+                    Focus Areas — prioritise these
                   </div>
-                  {wordDetail.length === 0 ? (
-                    <div
-                      style={{
-                        background: "#052e16",
-                        border: "1px solid #16a34a",
-                        borderRadius: 10,
-                        padding: 14,
-                        color: "#86efac",
-                        fontSize: 14,
-                      }}
-                    >
-                      ✅ All words have correct svara accent and shape!
-                    </div>
-                  ) : (
-                    wordDetail.map((item, i) => (
-                      <WordCard key={i} item={item} />
-                    ))
-                  )}
-
-                  {/* Zone feedback */}
-                  {d.svara?.fixes && d.svara.fixes.length > 0 && (
-                    <div style={{ marginTop: 16 }}>
-                      <div
-                        style={{
-                          fontSize: 13,
-                          color: "#94a3b8",
-                          marginBottom: 8,
-                        }}
-                      >
-                        General practice techniques:
+                  {r.priority.map((p, i) => (
+                    <div key={i} style={{
+                      display: "flex", justifyContent: "space-between", alignItems: "center",
+                      padding: "12px 0", borderBottom: i < r.priority.length - 1 ? "1px solid #ece7e0" : "none"
+                    }}>
+                      <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                        <span style={{
+                          color: i === 0 ? "#991b1b" : i === 1 ? "#b5621a" : "#9c9189",
+                          fontSize: 11, fontWeight: 700, width: 16, textAlign: "center"
+                        }}>{i + 1}</span>
+                        <span style={{ fontSize: 14, color: "#3d3028" }}>{p.dimension}</span>
                       </div>
-                      <FeedbackList items={d.svara.fixes} />
+                      <div style={{ textAlign: "right" }}>
+                        <div style={{ fontSize: 14, fontWeight: 600, color: gradeColor(p.score), fontFamily: "monospace" }}>{p.score}%</div>
+                        <div style={{ fontSize: 11, color: "#b0a898" }}>impact {p.impact}</div>
+                      </div>
                     </div>
-                  )}
+                  ))}
                 </div>
               )}
 
-              {/* ── UCCHARANA TAB ── */}
-              {activeTab === "uccharana" && (
-                <div>
-                  {/* Sub-scores */}
-                  <div
-                    style={{
-                      display: "flex",
-                      gap: 10,
-                      marginBottom: 16,
-                      flexWrap: "wrap",
-                    }}
-                  >
-                    {[
-                      ["Char", sc.text_similarity],
-                      ["Word", d.uccharana?.word_sim],
-                      ["Syllable", d.uccharana?.syl_sim],
-                    ].map(
-                      ([label, val]) =>
-                        val != null && (
-                          <div
-                            key={label}
-                            style={{
-                              background: "#0f172a",
-                              borderRadius: 10,
-                              padding: "12px 16px",
-                              flex: 1,
-                              minWidth: 80,
-                            }}
-                          >
-                            <div style={{ fontSize: 11, color: "#64748b" }}>
-                              {label}
-                            </div>
-                            <div
-                              style={{
-                                fontSize: 22,
-                                fontWeight: 800,
-                                color: gradeColor(val),
-                              }}
-                            >
-                              {Math.round(val)}%
-                            </div>
+              {/* Praises */}
+              {r.all_praises && r.all_praises.length > 0 && (
+                <div style={{ background: "#f0f7f4", border: "1px solid #a8d5c2", borderRadius: 2, padding: "20px 24px", marginBottom: 16 }}>
+                  <div style={{ fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", color: "#2d6a4f", fontWeight: 600, marginBottom: 14 }}>
+                    Sādhu — what you did well
+                  </div>
+                  {r.all_praises.map((p, i) => (
+                    <div key={i} style={{ fontSize: 13, color: "#1a4a35", marginBottom: 7, fontFamily: "'Crimson Text', Georgia, serif", lineHeight: 1.6 }}>
+                      ✓ {p}
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* Detail tabs */}
+              <div style={{ background: "#faf8f5", border: "1px solid #ddd6cc", borderRadius: 2, padding: "24px 28px", marginBottom: 16 }}>
+                <div style={{ display: "flex", gap: 8, marginBottom: 22, flexWrap: "wrap" }}>
+                  <Tab label="Svara"      active={activeTab === "svara"}      onClick={() => setActiveTab("svara")} />
+                  <Tab label="Ucchāraṇa" active={activeTab === "uccharana"}  onClick={() => setActiveTab("uccharana")} />
+                  <Tab label="Laya"       active={activeTab === "laya"}       onClick={() => setActiveTab("laya")} />
+                  <Tab label="Nāda"       active={activeTab === "nada"}       onClick={() => setActiveTab("nada")} />
+                </div>
+
+                {activeTab === "svara" && (
+                  <div>
+                    {d.svara?.issues && d.svara.issues.length > 0 && (
+                      <div style={{ marginBottom: 18 }}>
+                        <div style={{ fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", color: "#9c9189", fontWeight: 600, marginBottom: 10 }}>Summary</div>
+                        <FeedbackList items={d.svara.issues} />
+                      </div>
+                    )}
+                    <div style={{ fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", color: "#9c9189", fontWeight: 600, marginBottom: 12 }}>Word-by-word breakdown</div>
+                    {wordDetail.length === 0 ? (
+                      <div style={{ background: "#f0f7f4", border: "1px solid #a8d5c2", borderRadius: 2, padding: 14, color: "#2d6a4f", fontSize: 14, fontFamily: "'Crimson Text', Georgia, serif" }}>
+                        All words carry correct svara accent and shape.
+                      </div>
+                    ) : (
+                      wordDetail.map((item, i) => <WordCard key={i} item={item} />)
+                    )}
+                    {d.svara?.fixes && d.svara.fixes.length > 0 && (
+                      <div style={{ marginTop: 18 }}>
+                        <div style={{ fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", color: "#9c9189", fontWeight: 600, marginBottom: 10 }}>Practice techniques</div>
+                        <FeedbackList items={d.svara.fixes} />
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {activeTab === "uccharana" && (
+                  <div>
+                    <div style={{ display: "flex", gap: 10, marginBottom: 18, flexWrap: "wrap" }}>
+                      {[["Char", sc.text_similarity], ["Word", d.uccharana?.word_sim], ["Syllable", d.uccharana?.syl_sim]].map(
+                        ([label, val]) => val != null && (
+                          <div key={label} style={{ background: "#f5f1eb", border: "1px solid #ddd6cc", borderRadius: 2, padding: "14px 18px", flex: 1, minWidth: 80 }}>
+                            <div style={{ fontSize: 11, color: "#9c9189", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 4 }}>{label}</div>
+                            <div style={{ fontSize: 24, fontWeight: 600, color: gradeColor(val), fontFamily: "monospace" }}>{Math.round(val)}%</div>
                           </div>
-                        ),
+                        )
+                      )}
+                    </div>
+                    {d.uccharana?.issues && d.uccharana.issues.length > 0 ? (
+                      <div style={{ marginBottom: 14 }}>
+                        <div style={{ fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", color: "#9c9189", fontWeight: 600, marginBottom: 10 }}>Issues</div>
+                        <FeedbackList items={d.uccharana.issues} variant="error" />
+                      </div>
+                    ) : (
+                      <div style={{ color: "#2d6a4f", fontSize: 14, marginBottom: 14, fontFamily: "'Crimson Text', Georgia, serif" }}>
+                        No pronunciation issues detected.
+                      </div>
                     )}
-                  </div>
-
-                  {/* Issues */}
-                  {d.uccharana?.issues && d.uccharana.issues.length > 0 ? (
-                    <div style={{ marginBottom: 14 }}>
-                      <div
-                        style={{
-                          fontSize: 13,
-                          color: "#94a3b8",
-                          marginBottom: 8,
-                        }}
-                      >
-                        Issues:
-                      </div>
-                      <FeedbackList
-                        items={d.uccharana.issues}
-                        bg="#2d0f0f"
-                        border="#dc2626"
-                        color="#fca5a5"
-                      />
-                    </div>
-                  ) : (
-                    <div
-                      style={{
-                        color: "#22c55e",
-                        fontSize: 14,
-                        marginBottom: 14,
-                      }}
-                    >
-                      ✅ No pronunciation issues detected
-                    </div>
-                  )}
-
-                  {/* Fixes */}
-                  {d.uccharana?.fixes && d.uccharana.fixes.length > 0 && (
-                    <div>
-                      <div
-                        style={{
-                          fontSize: 13,
-                          color: "#94a3b8",
-                          marginBottom: 8,
-                        }}
-                      >
-                        How to improve:
-                      </div>
-                      <FeedbackList items={d.uccharana.fixes} />
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* ── LAYA TAB ── */}
-              {activeTab === "laya" && (
-                <div>
-                  <div style={{ display: "flex", gap: 10, marginBottom: 16 }}>
-                    <div
-                      style={{
-                        background: "#0f172a",
-                        borderRadius: 10,
-                        padding: "14px 20px",
-                        flex: 1,
-                        textAlign: "center",
-                      }}
-                    >
-                      <div
-                        style={{
-                          fontSize: 11,
-                          color: "#64748b",
-                          marginBottom: 4,
-                        }}
-                      >
-                        Rhythm Score
-                      </div>
-                      <div
-                        style={{
-                          fontSize: 36,
-                          fontWeight: 900,
-                          color: gradeColor(d.laya?.score ?? 0),
-                        }}
-                      >
-                        {d.laya?.score ?? 0}%
-                      </div>
-                    </div>
-                    {d.laya?.duration_ratio != null && (
-                      <div
-                        style={{
-                          background: "#0f172a",
-                          borderRadius: 10,
-                          padding: "14px 20px",
-                          flex: 1,
-                          textAlign: "center",
-                        }}
-                      >
-                        <div
-                          style={{
-                            fontSize: 11,
-                            color: "#64748b",
-                            marginBottom: 4,
-                          }}
-                        >
-                          Duration vs Reference
-                        </div>
-                        <div
-                          style={{
-                            fontSize: 36,
-                            fontWeight: 900,
-                            color:
-                              Math.abs(d.laya.duration_ratio - 1) < 0.15
-                                ? "#22c55e"
-                                : "#f97316",
-                          }}
-                        >
-                          {d.laya.duration_ratio}×
-                        </div>
-                        <div style={{ fontSize: 11, color: "#64748b" }}>
-                          {d.laya.duration_ratio > 1.15
-                            ? "Too slow — speed up"
-                            : d.laya.duration_ratio < 0.85
-                              ? "Too fast — slow down"
-                              : "Good pace ✓"}
-                        </div>
+                    {d.uccharana?.fixes && d.uccharana.fixes.length > 0 && (
+                      <div>
+                        <div style={{ fontSize: 11, letterSpacing: "0.1em", textTransform: "uppercase", color: "#9c9189", fontWeight: 600, marginBottom: 10 }}>How to improve</div>
+                        <FeedbackList items={d.uccharana.fixes} />
                       </div>
                     )}
                   </div>
+                )}
 
-                  {d.laya?.issues && d.laya.issues.length > 0 && (
-                    <div style={{ marginBottom: 14 }}>
-                      <div
-                        style={{
-                          fontSize: 13,
-                          color: "#94a3b8",
-                          marginBottom: 8,
-                        }}
-                      >
-                        Issues:
-                      </div>
-                      <FeedbackList
-                        items={d.laya.issues}
-                        bg="#2d0f0f"
-                        border="#dc2626"
-                        color="#fca5a5"
-                      />
-                    </div>
-                  )}
-                  {d.laya?.fixes && d.laya.fixes.length > 0 && (
-                    <div>
-                      <div
-                        style={{
-                          fontSize: 13,
-                          color: "#94a3b8",
-                          marginBottom: 8,
-                        }}
-                      >
-                        How to improve:
-                      </div>
-                      <FeedbackList items={d.laya.fixes} />
-                    </div>
-                  )}
-                  {(!d.laya?.issues || d.laya.issues.length === 0) && (
-                    <div style={{ color: "#22c55e", fontSize: 14 }}>
-                      ✅ Laya is steady — good rhythmic flow
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* ── NADA TAB ── */}
-              {activeTab === "nada" && (
-                <div>
-                  <div
-                    style={{
-                      background: "#0f172a",
-                      borderRadius: 10,
-                      padding: 20,
-                      textAlign: "center",
-                      marginBottom: 16,
-                    }}
-                  >
-                    <div
-                      style={{
-                        fontSize: 11,
-                        color: "#64748b",
-                        marginBottom: 4,
-                      }}
-                    >
-                      Voice Quality Score
-                    </div>
-                    <div
-                      style={{
-                        fontSize: 56,
-                        fontWeight: 900,
-                        color: gradeColor(d.nada?.score ?? 0),
-                      }}
-                    >
-                      {d.nada?.score ?? 0}%
-                    </div>
-                  </div>
-
-                  {d.nada?.issues && d.nada.issues.length > 0 ? (
-                    <div style={{ marginBottom: 14 }}>
-                      <div
-                        style={{
-                          fontSize: 13,
-                          color: "#94a3b8",
-                          marginBottom: 8,
-                        }}
-                      >
-                        Issues:
-                      </div>
-                      <FeedbackList
-                        items={d.nada.issues}
-                        bg="#2d0f0f"
-                        border="#dc2626"
-                        color="#fca5a5"
-                      />
-                    </div>
-                  ) : (
-                    <div
-                      style={{
-                        color: "#22c55e",
-                        fontSize: 14,
-                        marginBottom: 14,
-                      }}
-                    >
-                      ✅ Nāda quality is authentic
-                    </div>
-                  )}
-
-                  {d.nada?.fixes && d.nada.fixes.length > 0 && (
-                    <div>
-                      <div
-                        style={{
-                          fontSize: 13,
-                          color: "#94a3b8",
-                          marginBottom: 8,
-                        }}
-                      >
-                        How to improve:
-                      </div>
-                      <FeedbackList items={d.nada.fixes} />
-                    </div>
-                  )}
-
-                  {d.nada?.praises && d.nada.praises.length > 0 && (
-                    <div style={{ marginTop: 12 }}>
-                      {d.nada.praises.map((p, i) => (
-                        <div key={i} style={{ fontSize: 13, color: "#86efac" }}>
-                          ✓ {p}
+                {activeTab === "laya" && (
+                  <div>
+                    <div style={{ display: "flex", gap: 10, marginBottom: 18 }}>
+                      <div style={{ background: "#f5f1eb", border: "1px solid #ddd6cc", borderRadius: 2, padding: "18px 22px", flex: 1, textAlign: "center" }}>
+                        <div style={{ fontSize: 11, color: "#9c9189", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>Rhythm Score</div>
+                        <div style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 40, fontWeight: 400, color: gradeColor(d.laya?.score ?? 0) }}>
+                          {d.laya?.score ?? 0}%
                         </div>
-                      ))}
+                      </div>
+                      {d.laya?.duration_ratio != null && (
+                        <div style={{ background: "#f5f1eb", border: "1px solid #ddd6cc", borderRadius: 2, padding: "18px 22px", flex: 1, textAlign: "center" }}>
+                          <div style={{ fontSize: 11, color: "#9c9189", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>Duration ratio</div>
+                          <div style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 40, fontWeight: 400, color: Math.abs(d.laya.duration_ratio - 1) < 0.15 ? "#2d6a4f" : "#b5621a" }}>
+                            {d.laya.duration_ratio}×
+                          </div>
+                          <div style={{ fontSize: 12, color: "#9c9189", marginTop: 4 }}>
+                            {d.laya.duration_ratio > 1.15 ? "Too slow" : d.laya.duration_ratio < 0.85 ? "Too fast" : "Good pace"}
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  )}
+                    {d.laya?.issues && d.laya.issues.length > 0 && <FeedbackList items={d.laya.issues} variant="error" />}
+                    {d.laya?.fixes && d.laya.fixes.length > 0 && <FeedbackList items={d.laya.fixes} />}
+                    {(!d.laya?.issues || d.laya.issues.length === 0) && (
+                      <div style={{ color: "#2d6a4f", fontSize: 14, fontFamily: "'Crimson Text', Georgia, serif" }}>Laya is steady — good rhythmic flow.</div>
+                    )}
+                  </div>
+                )}
+
+                {activeTab === "nada" && (
+                  <div>
+                    <div style={{ background: "#f5f1eb", border: "1px solid #ddd6cc", borderRadius: 2, padding: "20px 24px", textAlign: "center", marginBottom: 18 }}>
+                      <div style={{ fontSize: 11, color: "#9c9189", letterSpacing: "0.08em", textTransform: "uppercase", marginBottom: 6 }}>Voice Quality Score</div>
+                      <div style={{ fontFamily: "'Cormorant Garamond', Georgia, serif", fontSize: 56, fontWeight: 300, color: gradeColor(d.nada?.score ?? 0) }}>
+                        {d.nada?.score ?? 0}%
+                      </div>
+                    </div>
+                    {d.nada?.issues && d.nada.issues.length > 0 ? <FeedbackList items={d.nada.issues} variant="error" /> : (
+                      <div style={{ color: "#2d6a4f", fontSize: 14, marginBottom: 14, fontFamily: "'Crimson Text', Georgia, serif" }}>Nāda quality is authentic.</div>
+                    )}
+                    {d.nada?.fixes && d.nada.fixes.length > 0 && <FeedbackList items={d.nada.fixes} />}
+                    {d.nada?.praises && d.nada.praises.length > 0 && (
+                      <div style={{ marginTop: 12 }}>
+                        {d.nada.praises.map((p, i) => (
+                          <div key={i} style={{ fontSize: 13, color: "#2d6a4f", fontFamily: "'Crimson Text', Georgia, serif" }}>✓ {p}</div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Sadhana tip */}
+              <div style={{ background: "#faf8f5", border: "1px solid #c8c0b4", borderRadius: 2, padding: "24px 28px", marginBottom: 32, borderLeft: "3px solid #8b7355" }}>
+                <div style={{ fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", color: "#8b7355", fontWeight: 600, marginBottom: 12 }}>
+                  Daily Sādhana Recommendation
                 </div>
-              )}
-            </div>
+                <p style={{ fontFamily: "'Crimson Text', Georgia, serif", fontSize: 15, color: "#3d3028", lineHeight: 1.8, margin: 0 }}>
+                  {r.sadhana_tip}
+                </p>
+              </div>
+            </>
+          )}
 
-            {/* Sadhana tip */}
-            <div
-              style={{
-                background: "linear-gradient(135deg, #1c1917, #292524)",
-                border: "1px solid #92400e",
-                borderRadius: 16,
-                padding: 24,
-                marginBottom: 32,
-              }}
-            >
-              <div style={{ fontSize: 24, marginBottom: 8 }}>🪔</div>
-              <h3
-                style={{
-                  fontSize: 14,
-                  fontWeight: 800,
-                  color: "#fbbf24",
-                  marginBottom: 8,
-                }}
-              >
-                Daily Sādhana Recommendation
-              </h3>
-              <p
-                style={{
-                  fontSize: 14,
-                  color: "#d6d3d1",
-                  lineHeight: 1.7,
-                  margin: 0,
-                }}
-              >
-                {r.sadhana_tip}
-              </p>
-            </div>
-          </>
-        )}
-
-        <div
-          style={{
-            textAlign: "center",
-            color: "#1e293b",
-            fontSize: 13,
-            paddingBottom: 16,
-          }}
-        >
-          ॐ शान्तिः शान्तिः शान्तिः
+          {/* Footer */}
+          <div style={{ textAlign: "center", color: "#c0b8ae", fontSize: 13, paddingTop: 20, borderTop: "1px solid #e8e2d9", fontStyle: "italic" }}>
+            ॐ शान्तिः शान्तिः शान्तिः
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }
