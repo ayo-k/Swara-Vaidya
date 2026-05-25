@@ -220,8 +220,12 @@ export default function App() {
         @import url('https://fonts.googleapis.com/css2?family=Crimson+Text:ital,wght@0,400;0,600;0,700;1,400&family=Cormorant+Garamond:wght@300;400;500;600&display=swap');
         * { box-sizing: border-box; }
         body { margin: 0; background: #f5f1eb; }
-        audio { filter: sepia(0.1); }
-        audio::-webkit-media-controls-panel { background: #f0ebe3; }
+        audio { filter: none; color-scheme: light; }
+        audio::-webkit-media-controls-panel { background: #c8b99a; }
+        audio::-webkit-media-controls-current-time-display { color: #1a1614 !important; }
+        audio::-webkit-media-controls-time-remaining-display { color: #1a1614 !important; }
+        audio::-webkit-media-controls-timeline { background: #8b7355; }
+        audio::-webkit-media-controls-play-button { filter: invert(0.8); }
         button:hover { opacity: 0.88; }
       `}</style>
 
@@ -453,9 +457,9 @@ export default function App() {
                   width: "100%",
                   borderRadius: 2,
                   marginBottom: 18,
-                  border: "1px solid #b5a88a",
-                  backgroundColor: "#c89435",
-                  filter: "sepia(0.3) contrast(1.1)",
+                  border: "1px solid #8b7355",
+                  backgroundColor: "#c8b99a",
+                  colorScheme: "light",
                 }}
               />
             )}
