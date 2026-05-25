@@ -364,8 +364,7 @@ export default function App() {
 
               {/* Overall score */}
               <div style={{ background: "#faf8f5", border: "1px solid #ddd6cc", borderRadius: 2, padding: "28px 28px 24px", marginBottom: 16 }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                  <div>
+                <div style={{ textAlign: "center" }}>
                     <div style={{ fontSize: 11, letterSpacing: "0.12em", textTransform: "uppercase", color: "#9c9189", fontWeight: 600, marginBottom: 8 }}>
                       Resonance Score
                     </div>
@@ -382,7 +381,6 @@ export default function App() {
                          : "Beginning stage"}
                       </span>
                     </div>
-                  </div>
                 </div>
 
                 {r.user_transcript && (
