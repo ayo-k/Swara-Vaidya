@@ -1,7 +1,7 @@
 import librosa
 import numpy as np
 import json
-import whisper as _whisper
+from transformers import Wav2Vec2ForCTC, Wav2Vec2FeatureExtractor, Wav2Vec2CTCTokenizer
 from sklearn.preprocessing import StandardScaler
 from librosa.sequence import dtw
 from difflib import SequenceMatcher
@@ -14,7 +14,10 @@ import os
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 # Load Whisper once (shared by direct run and API)
 # ── These are safe at module level (just assignments, no I/O) ──
-WHISPER_MODEL = None   # loaded lazily in _load_references()
+MMS_MODEL = None   # loaded lazily in _load_references()
+MMS_FEATURE_EXTRACTOR = None
+MMS_TOKENIZER         = {}
+MMS_PROCESSOR = None
 ref_pitch     = None
 ref_tempo     = None
 ref_mfcc      = None
@@ -27,17 +30,38 @@ def _load_references():
     Called ONCE when the first request arrives (not at import time).
     This lets uvicorn bind the port immediately, then load heavy models.
     """
-    global WHISPER_MODEL, ref_pitch, ref_tempo, ref_mfcc
+    global MMS_MODEL, MMS_FEATURE_EXTRACTOR, MMS_TOKENIZER, MMS_PROCESSOR, ref_pitch, ref_tempo, ref_mfcc
     global ref_audio, ref_sr, ref_mantra
 
-    if WHISPER_MODEL is not None:
+    if MMS_MODEL is not None:
         return   # already loaded — skip
 
-    print("Loading Whisper model...")
-    WHISPER_MODEL = _whisper.load_model("base")
-    print("Whisper ready.")
 
-    with open(os.path.join(BASE_DIR, "reference_features.json"), "r") as f:
+    print("Loading MMS model and tokenizer...")
+    
+    from transformers import AutoProcessor
+
+    target_language = "urd-script_devanagari"
+    model_id = "facebook/mms-1b-all"
+
+    # Use AutoProcessor — correct API for mms-1b-all
+    MMS_PROCESSOR = AutoProcessor.from_pretrained(model_id)
+    MMS_PROCESSOR.tokenizer.set_target_lang(target_language)
+
+    MMS_MODEL = Wav2Vec2ForCTC.from_pretrained(
+        model_id,
+        ignore_mismatched_sizes=True
+    )
+    MMS_MODEL.load_adapter(target_language)
+    MMS_MODEL.eval()
+
+    # Tokenizer is handled by the processor now
+    MMS_TOKENIZER = MMS_PROCESSOR.tokenizer
+    MMS_FEATURE_EXTRACTOR = MMS_PROCESSOR.feature_extractor
+
+    print("MMS Sanskrit configuration loaded successfully.")
+
+    with open(os.path.join(BASE_DIR, "reference_features.json"), "r", encoding="utf-8") as f:
         reference = json.load(f)
 
     ref_pitch  = np.array(reference["pitch_contour"])
@@ -260,7 +284,7 @@ def compare_pitch_zones(ref_zones, user_zones):
 #   - Classify every frame: below low_thresh=Anudatta, above high_thresh=Udatta
 #   - Compare the sequence of labels using SequenceMatcher
  
-def classify_accent_levels(pitch_contour):
+def classify_accent_levels(pitch_contour, low_thresh=None, high_thresh=None):
     """
     Classifies each pitch frame into one of 3 Vedic accent levels.
     Returns array of labels: 0=silence, 1=Anudatta(low), 2=neutral, 3=Udatta(high)
@@ -275,8 +299,10 @@ def classify_accent_levels(pitch_contour):
     # Percentile thresholds divide pitch range into 3 equal parts
     # 33rd percentile = lower third of pitch range = Anudatta region
     # 66th percentile = upper third of pitch range = Udatta region
-    low_thresh  = np.percentile(voiced, 33)
-    high_thresh = np.percentile(voiced, 66)
+    if low_thresh is None:
+        low_thresh  = np.percentile(voiced, 33)
+    if high_thresh is None:
+        high_thresh = np.percentile(voiced, 66)
  
     levels = []
     for p in pitch_contour:
@@ -626,7 +652,7 @@ def get_onset_envelope(y, sr):
 # -------------------------
 def clean_text(text):
     text = text.lower()
-    text = re.sub(r'[^a-z\s]', '', text)
+    text = re.sub(r'[^\u0900-\u097Fa-z\s]', '', text)  # keep Devanagari + latin + spaces
     text = re.sub(r'\s+', ' ', text).strip()
     return text
 
@@ -640,7 +666,12 @@ def split_syllables(text):
     Captures consonant clusters + vowel + optional trailing consonant.
     Works well for: om, namah, shivaya, ganapataye, etc.
     """
-    return re.findall(r'[bcdfghjklmnpqrstvwxyz]*[aeiou]+[bcdfghjklmnpqrstvwxyz]*', text)
+    if re.search(r'[\u0900-\u097F]', text):
+    # Devanagari: split on each syllable cluster (vowel or consonant+vowel)
+        return re.findall(r'[\u0900-\u097F]+', text)
+    else:
+    # Latin romanization fallback
+        return re.findall(r'[bcdfghjklmnpqrstvwxyz]*[aeiou]+[bcdfghjklmnpqrstvwxyz]*', text)
 
 # =============================================================================
 # 6. FEEDBACK ENGINE
@@ -1249,8 +1280,11 @@ def analyze_chant(user_audio_path: str) -> dict:
     zone_sim, zone_feedback = compare_pitch_zones(ref_zones, user_zones)
 
     # ── 1-b Accent classifier ──
-    ref_accent_levels  = classify_accent_levels(ref_pitch)
-    user_accent_levels = classify_accent_levels(pitch)
+    ref_voiced     = ref_pitch[ref_pitch > 0]
+    ref_low_thresh  = np.percentile(ref_voiced, 33)
+    ref_high_thresh = np.percentile(ref_voiced, 66)
+    ref_accent_levels  = classify_accent_levels(ref_pitch, ref_low_thresh, ref_high_thresh)
+    user_accent_levels = classify_accent_levels(pitch,     ref_low_thresh, ref_high_thresh)
     if len(ref_accent_levels) > 0 and len(user_accent_levels) > 0:
         accent_sim = SequenceMatcher(None, ref_accent_levels.tolist(), user_accent_levels.tolist()).ratio() * 100
     else:
@@ -1289,35 +1323,30 @@ def analyze_chant(user_audio_path: str) -> dict:
     ref_mfcc_combined = np.vstack([ref_mfcc_scaled, ref_delta])
     D, wp = dtw(mfcc_combined, ref_mfcc_combined, metric='euclidean')
     mfcc_distance   = D[-1, -1] / len(wp)
-    mfcc_similarity = 100 * np.exp(-mfcc_distance / 50)
+    mfcc_similarity = 100 * np.exp(-mfcc_distance / 10)
 
     # ── 4. Text / Whisper ──
     word_timestamps_data = []
     try:
-        user_result = WHISPER_MODEL.transcribe(
-            user_audio_path,
-            language                   = "en",
-            initial_prompt             = f"Sanskrit mantra: {ref_mantra}",
-            fp16                       = False,
-            temperature                = 0.0,
-            best_of                    = 1,
-            beam_size                  = 1,
-            condition_on_previous_text = False,
-            word_timestamps            = True,
+        audio_input, orig_sr = sf.read(user_audio_path)
+        if audio_input.ndim > 1:
+            audio_input = audio_input.mean(axis=1)
+        audio_16k = librosa.resample(
+            audio_input.astype(float), orig_sr=orig_sr, target_sr=16000
         )
-        user_text = user_result["text"].lower().strip()
-        for segment in user_result.get("segments", []):
-            for w in segment.get("words", []):
-                wc = re.sub(r'[^a-z\s]', '', w["word"].lower()).strip()
-                if wc:
-                    word_timestamps_data.append({
-                        "word":  wc,
-                        "start": float(w["start"]),
-                        "end":   float(w["end"]),
-                    })
+        # NEW
+        inputs = MMS_FEATURE_EXTRACTOR(
+            audio_16k, sampling_rate=16000, return_tensors="pt"
+        )
+        with torch.no_grad():
+            logits = MMS_MODEL(**inputs).logits
+        predicted_ids = torch.argmax(logits, dim=-1)
+        user_text = MMS_TOKENIZER.decode(predicted_ids[0].tolist(), skip_special_tokens=True).strip().lower()       
+        print(f"MMS transcript: {user_text}")
+
     except Exception as e:
-        print(f"Whisper error: {e}")
-        user_text = ref_mantra.lower().strip()
+        print(f"MMS error: {e}")
+        user_text = ""
 
     ref_clean  = clean_text(ref_mantra)
     user_clean = clean_text(user_text)
@@ -1385,11 +1414,15 @@ def analyze_chant(user_audio_path: str) -> dict:
 # 9. RUN DIRECTLY (python compare_chant.py) — unchanged behaviour
 # =============================================================================
 if __name__ == "__main__":
-    result = analyze_chant("user_chant1.wav")
-    print("\n========== RAW SCORES ==========")
-    print("Text Similarity  :", result["scores"]["text_similarity"],  "%")
-    print("Pitch Similarity :", result["scores"]["pitch_combined"],   "%")
-    print("Rhythm Similarity:", result["scores"]["tempo_similarity"], "%")
-    print("Voice Similarity :", result["scores"]["mfcc_similarity"],  "%")
-    print("Overall Score    :", result["scores"]["overall"],          "%")
-    print("================================")
+    import traceback
+    try:
+        result = analyze_chant("user_chant1.wav")
+        print("\n========== RAW SCORES ==========")
+        print("Text Similarity  :", result["scores"]["text_similarity"],  "%")
+        print("Pitch Similarity :", result["scores"]["pitch_combined"],   "%")
+        print("Rhythm Similarity:", result["scores"]["tempo_similarity"], "%")
+        print("Voice Similarity :", result["scores"]["mfcc_similarity"],  "%")
+        print("Overall Score    :", result["scores"]["overall"],          "%")
+        print("================================")
+    except Exception:
+        traceback.print_exc()
